@@ -51,22 +51,13 @@ SQL> CONNECT phishguard/phishguardpw@localhost:1521/ORCLPDB1;
 
 
 To show which container I am in:
-SHOW CON_NAME;
+SQL> SHOW CON_NAME;
 
 To list all PDBs:
-SHOW PDBS;
+SQL> SHOW PDBS;
 
+To see who you are:
+SQL> SELECT USER FROM dual;   -- For this project: expect PHISHGUARD
 
-
-
--- Who am I?
-SELECT USER FROM dual;         -- expect PHISHGUARD
-
--- What tables do I (PHISHGUARD) own?
-SELECT table_name FROM user_tables;
-
-
-
-This SQL code shows tables that are in the user.  
-
+This SQL code shows tables that are in the user:  
 SQL> SELECT table_name FROM user_tables;
