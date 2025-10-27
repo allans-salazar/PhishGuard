@@ -1,0 +1,3 @@
+to run app:
+
+npx expo start --host=localhost -c
