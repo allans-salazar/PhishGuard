@@ -1,0 +1,72 @@
+DATABASE NOTES -- Containers
+
+When you connect as SYSDBA without setting a container, you're working in the CDB root- not inside a PDB. 
+
+Container Database (CDB)
+│
+├── PDB$SEED          ← template used to create new PDBs
+├── ORCLPDB1          ← your main “pluggable” user database
+└── SYS / SYSTEM      ← root admin accounts (CDB-level)
+
+• Pluggable Database (PDBs) are inside of a CDB where a PDB is a independent mini-database that share the same engine. 
+
+For this project we use the ORCLPDB1 since the CDB root is for system administration, not app data. And each PDB acts as a isolated environment perfect for the app's data and users. 
+
+
+
+Connected to:
+Oracle Database 19c Enterprise Edition Release 19.0.0.0.0 - Production
+Version 19.19.0.0.0
+
+-- Connected as SYSDBA to the CDB root
+SQL> ALTER SESSION SET CONTAINER = ORCLPDB1;
+
+Session altered.
+
+-- Now inside the pluggable DB, create an app user
+SQL> CREATE USER PHISHGUARD IDENTIFIED BY phishguardpw;
+
+User PHISHGUARD created.
+
+SQL> GRANT CREATE SESSION TO PHISHGUARD;
+SQL> GRANT CREATE TABLE TO PHISHGUARD;
+SQL> GRANT CREATE SEQUENCE TO phishguard;
+SQL> GRANT CREATE VIEW TO phishguard;
+SQL> GRANT UNLIMITED TABLESPACE TO phishguard;
+
+
+
+
+
+To work as admin:
+
+SQL> CONNECT sys/oracle@localhost:1521/ORCLCDB AS SYSDBA;
+
+
+To work in the app's pluggable database: 
+
+SQL> CONNECT sys/oracle@localhost:1521/ORCLPDB1 AS SYSDBA;
+-- or directly connect as your app user
+SQL> CONNECT phishguard/phishguardpw@localhost:1521/ORCLPDB1;
+
+
+To show which container I am in:
+SHOW CON_NAME;
+
+To list all PDBs:
+SHOW PDBS;
+
+
+
+
+-- Who am I?
+SELECT USER FROM dual;         -- expect PHISHGUARD
+
+-- What tables do I (PHISHGUARD) own?
+SELECT table_name FROM user_tables;
+
+
+
+This SQL code shows tables that are in the user.  
+
+SQL> SELECT table_name FROM user_tables;

@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+python-dotenv
+pyjwt
+oracledb
+httpx
+passlib[argon2]==1.7.4
+argon2-cffi
