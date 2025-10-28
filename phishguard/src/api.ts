@@ -2,81 +2,120 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-const BASE = "http://127.0.0.1:8000"; // use localhost for iOS simulator
+const BASE = "http://127.0.0.1:8000"; // change if needed
 
-let token: string | null = null;
+const api = axios.create({
+  baseURL: BASE,
+  timeout: 8000,
+});
 
-export async function setToken(t: string | null) {
-  token = t;
-  if (t) await SecureStore.setItemAsync("pg_token", t);
-  else await SecureStore.deleteItemAsync("pg_token");
+// --- Token helpers ---
+const TOKEN_KEY = "phishguard_token";
+
+export async function saveToken(t: string) {
+  await SecureStore.setItemAsync(TOKEN_KEY, t);
 }
 
 export async function loadToken() {
-  if (!token) token = await SecureStore.getItemAsync("pg_token");
-  return token;
+  return await SecureStore.getItemAsync(TOKEN_KEY);
 }
 
-const api = axios.create({ baseURL: BASE });
+export async function removeToken() {
+  await SecureStore.deleteItemAsync(TOKEN_KEY);
+}
 
-api.interceptors.request.use(async (config) => {
+// attach token to axios
+export async function setAuthHeaderFromStorage() {
   const t = await loadToken();
-  if (t) (config.headers as any).Authorization = `Bearer ${t}`;
-  return config;
-});
+  if (t) api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
+  else delete api.defaults.headers.common["Authorization"];
+}
 
-// Auth
-export async function register(email: string, password: string, role = "CUSTOMER") {
+// --- Auth endpoints ---
+export async function register(email: string, password: string, role: "CUSTOMER" | "PROVIDER") {
   const { data } = await api.post("/auth/register", { email, password, role });
-  await setToken(data.token);
   return data;
 }
+
 export async function login(email: string, password: string) {
   const { data } = await api.post("/auth/login", { email, password });
-  await setToken(data.token);
+  // assume server returns { token: "..." } or similar
+  if (data?.token) {
+    await saveToken(data.token);
+    api.defaults.headers.common["Authorization"] = `Bearer ${data.token}`;
+  }
   return data;
 }
+
 export async function logout() {
-  await setToken(null);
+  await removeToken();
+  delete api.defaults.headers.common["Authorization"];
 }
 
-// Wallet
+// --- Example protected API helpers (use after login) ---
+export async function listModules() {
+  // GET /provider/modules or /modules depending on backend; adjust path if needed
+  const { data } = await api.get("/modules"); 
+  return data;
+}
+
 export async function topup(amount: number) {
-  const { data } = await api.post(`/wallet/topup`, null, { params: { amount } });
-  return data; // { ok, credits }
+  const { data } = await api.post("/wallet/topup", { amount });
+  return data;
+}
+
+export async function listCatalog() {
+  const { data } = await api.get("/catalog/modules");
+  return data as { id:number; title:string; description:string; price:number; provider_email:string }[];
+}
+
+export async function walletBalance() {
+  await setAuthHeaderFromStorage();
+  const { data } = await api.get("/wallet/balance");
+  return data as { credits: number };
+}
+
+export async function walletTopup(amount: number) {
+  await setAuthHeaderFromStorage();
+  const { data } = await api.post("/wallet/topup", { amount });
+  return data;
 }
 
 export async function purchase(moduleId: number) {
+  await setAuthHeaderFromStorage();
   const { data } = await api.post(`/purchase/${moduleId}`);
-  return data; // { ok, credits }
+  return data;
 }
 
-// Catalog / Provider
-export async function listModules() {
-  const { data } = await api.get("/catalog/modules");
-  return data as { id: number; title: string; description: string; price: number }[];
-}
-export async function createModule(payload: { title: string; description?: string; price?: number }) {
-  const { data } = await api.post("/provider/modules", payload);
-  return data; // { id }
-}
-export async function createScenario(payload: { module_id: number; channel: string; prompt: string; correct_choice: number }) {
-  const { data } = await api.post("/provider/scenarios", payload);
-  return data; // { id }
+export async function providerListModules() {
+  await setAuthHeaderFromStorage();
+  const { data } = await api.get("/provider/modules");
+  return data as { id:number; title:string; description:string; price:number }[];
 }
 
-// Training
-export async function getScenarios(moduleId: number) {
-  const { data } = await api.get(`/train/${moduleId}/scenarios`);
-  return data as { id: number; channel: string; prompt: string }[];
-}
-export async function attemptScenario(scenario_id: number, user_choice: number) {
-  const { data } = await api.post(`/train/attempt`, { scenario_id, user_choice });
-  return data; // { correct: boolean }
+export async function providerCreateModule(title: string, description: string, price: number) {
+  await setAuthHeaderFromStorage();
+  const { data } = await api.post("/provider/modules", { title, description, price });
+  return data as { id:number; ok:boolean };
 }
 
-// AI
-export async function askAI(question: string) {
-  const { data } = await api.post(`/ai/ask`, { question });
-  return data as { answer: string };
+export async function providerCreateScenario(moduleId: number, channel: "EMAIL"|"SMS"|"WEB", prompt: string, correct_choice: 0|1) {
+  await setAuthHeaderFromStorage();
+  const { data } = await api.post(`/provider/modules/${moduleId}/scenarios`, { channel, prompt, correct_choice });
+  return data as { id:number; ok:boolean };
 }
+
+// export default if you like named imports
+export default {
+  api,
+  saveToken,
+  loadToken,
+  removeToken,
+  setAuthHeaderFromStorage,
+  register,
+  login,
+  logout,
+  listModules,
+  topup,
+  purchase,
+};
