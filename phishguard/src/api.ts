@@ -105,6 +105,13 @@ export async function providerCreateScenario(moduleId: number, channel: "EMAIL"|
   return data as { id:number; ok:boolean };
 }
 
+// --- AI (chat helper) ---
+export async function askAI(question: string) {
+  await setAuthHeaderFromStorage(); // if your other calls use this
+  const { data } = await api.post("/ai/ask", { question });
+  return data as { answer: string };
+}
+
 // export default if you like named imports
 export default {
   api,
