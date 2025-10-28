@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, FlatList, Button, Alert } from "react-native";
-import { listCatalog, walletBalance, walletTopup, purchase } from "../src/api";
+import { listCatalog, walletBalance, walletTopup, purchase } from "../../src/api";
 
 export default function Catalog() {
   const [items, setItems] = useState<any[]>([]);

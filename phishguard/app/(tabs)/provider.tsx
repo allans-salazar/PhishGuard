@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, Button, Alert, FlatList } from "react-native";
-import { providerListModules, providerCreateModule, providerCreateScenario } from "../src/api";
+import { providerListModules, providerCreateModule, providerCreateScenario } from "../../src/api";
 
 export default function Provider() {
   const [mods, setMods] = useState<any[]>([]);

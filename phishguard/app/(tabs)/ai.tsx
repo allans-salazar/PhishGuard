@@ -1,7 +1,7 @@
 // app/ai.tsx
 import React, { useRef, useState } from "react";
 import { View, Text, TextInput, TouchableOpacity, ActivityIndicator, FlatList } from "react-native";
-import { askAI } from "../src/api";
+import { askAI } from "../../src/api";
 
 type Msg = { id: string; role: "user" | "assistant"; text: string };
 

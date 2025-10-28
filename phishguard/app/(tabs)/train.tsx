@@ -1,7 +1,7 @@
 // phishguard/app/train.tsx
 import { useEffect, useState } from "react";
 import { View, Text, TextInput, Button, FlatList, Alert } from "react-native";
-import { getScenarios, attemptScenario } from "../src/api";
+import { getScenarios, attemptScenario } from "../../src/api";
 
 export default function TrainScreen() {
   const [moduleId, setModuleId] = useState("");
