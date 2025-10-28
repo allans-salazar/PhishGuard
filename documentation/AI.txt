@@ -1,0 +1,31 @@
+% ollama serve 
+
+starts the Ollama server locally on port 11434.
+It’s what allows your backend (app.py) to talk to the model.
+
+
+
+% ollama pull llama3.2:3b 
+
+Downloads the model once. After that, it’s stored locally (so you don’t need to pull it again unless you delete it or switch models).
+
+
+
+% brew services start ollama
+
+This command runs Ollama as a background macOS service, so it auto-starts every time your Mac boots. No need to keep a terminal open for it:
+
+
+
+% brew services list
+
+% brew services stop ollama
+% brew services restart ollama
+
+Stop or restart Ollama anytime
+
+
+
+% brew services list ollama run llama3.2:3b
+
+Talk to the model directly on terminal

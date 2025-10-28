@@ -2,9 +2,10 @@
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 import os
 import oracledb
+import httpx  # <-- for calling local Ollama
 
 from db import query
 from auth import (
@@ -15,6 +16,10 @@ from auth import (
     get_current_user,   # returns {id, email, role}
     require_provider,   # ensures provider; returns same dict
 )
+
+# ---- Local LLM config (Ollama) ----
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
+OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
 app = FastAPI(title="PhishGuard API")
 
@@ -40,6 +45,18 @@ def driver_mode():
 def db_ping():
     rows = query("SELECT SYSTIMESTAMP FROM dual")
     return {"db": "ok", "time": str(rows[0][0])}
+
+@app.get("/ai/status")
+def ai_status():
+    s = check_ollama_ready()
+    ok = s["up"] and s["model_present"]
+    resp = {"ok": ok, "ollama": s}
+    if not ok:
+        resp["how_to_fix"] = [
+            "brew services start ollama",
+            f"ollama pull {OLLAMA_MODEL}",
+        ]
+    return resp
 
 # ---------- Auth ----------
 class RegisterBody(BaseModel):
@@ -261,17 +278,121 @@ def attempt(body: AttemptBody, user: Dict[str, Any] = Depends(get_current_user))
     )
     return {"correct": bool(is_correct)}
 
-# ---------- AI (placeholder) ----------
+# ---------- AI via local Ollama (universal /api/generate) ----------
+def ask_ollama(question: str, user_email: str = "") -> str | None:
+    """
+    Calls a local Ollama model using /api/generate (works on all versions).
+    Returns the assistant text, or None on failure (so we can fall back).
+    """
+    system_prompt = (
+        "You are PhishGuard, a concise cybersecurity coach for phishing awareness. "
+        "Give short, actionable answers (2–5 bullets max). "
+        "Never ask for secrets or OTP codes. If asked for personal data, warn the user."
+    )
+    # Combine system + user into a single prompt (since /api/generate isn't chat-native)
+    prompt = (
+        f"{system_prompt}\n\n"
+        f"User question:\n{(question or '').strip()}\n\n"
+        "Respond briefly and clearly."
+    )
+
+    try:
+        with httpx.Client(timeout=30) as client:
+            r = client.post(
+                f"{OLLAMA_URL}/api/generate",
+                json={
+                    "model": OLLAMA_MODEL,   # defaults to "llama3.2:3b"
+                    "prompt": prompt,
+                    "stream": False
+                },
+            )
+            r.raise_for_status()
+            data = r.json()  # -> {"response": "...", ...}
+            return (data.get("response") or "").strip()
+    except Exception:
+        return None
+    
 class AskBody(BaseModel):
     question: str
 
 @app.post("/ai/ask")
 def ai_ask(body: AskBody, user: Dict[str, Any] = Depends(get_current_user)):
-    q = (body.question or "").lower()
-    if "bank" in q or "password" in q:
-        return {"answer": "Be cautious of urgent password reset requests and links. Use your bank's official app or site."}
-    if "otp" in q or "code" in q:
-        return {"answer": "Never share one-time codes. Legitimate support will not ask for your OTP."}
-    if "phish" in q or "phishing" in q:
-        return {"answer": "Red flags: urgency, mismatched URLs, unexpected attachments, and requests for credentials."}
-    return {"answer": "General cyber tip: verify sender domains, hover links, enable MFA, avoid password reuse."}
+    q = (body.question or "").strip()
+    if not q:
+        raise HTTPException(400, "question required")
+
+    # 1) Check Ollama status up front
+    s = check_ollama_ready()
+    if not s["up"] or not s["model_present"]:
+        # Return a clear message + diagnostics (so the app can show a friendly banner)
+        return {
+            "answer": (
+                "Local AI isn’t ready yet.\n"
+                "• Start Ollama:  brew services start ollama\n"
+                f"• Ensure model:  ollama pull {OLLAMA_MODEL}\n"
+                f"• API URL:       {OLLAMA_URL}"
+            ),
+            "diagnostic": s,
+        }
+
+    # 2) Try local model
+    answer = ask_ollama(q, user_email=user.get("email", ""))
+    if answer:
+        return {"answer": answer}
+
+    # 3) Fallback text (if API hiccups mid-call)
+    low = q.lower()
+    if any(k in low for k in ["phish", "phishing", "link", "otp", "password", "bank"]):
+        return {
+            "answer": (
+                "Quick checks:\n"
+                "• Be wary of urgency or threats\n"
+                "• Hover links for domain mismatches\n"
+                "• Don’t share OTPs or passwords\n"
+                "• Verify via official app/website\n"
+                "• Enable MFA"
+            )
+        }
+    return {
+        "answer": "General cyber tip: verify sender, hover links, use MFA, and avoid password reuse."
+    }
+
+# ---- Ollama readiness check ----
+def check_ollama_ready() -> dict:
+    """
+    Returns a small status dict:
+      {
+        "up": bool,                 # Ollama API reachable
+        "version": "0.x.y" | None,
+        "model_present": bool,      # target model exists locally
+        "model": OLLAMA_MODEL,
+        "url": OLLAMA_URL
+      }
+    """
+    status = {
+        "up": False,
+        "version": None,
+        "model_present": False,
+        "model": OLLAMA_MODEL,
+        "url": OLLAMA_URL,
+    }
+    try:
+        with httpx.Client(timeout=5) as c:
+            # Is the Ollama API up?
+            r = c.get(f"{OLLAMA_URL}/api/version")
+            r.raise_for_status()
+            status["up"] = True
+            try:
+                status["version"] = r.json().get("version")
+            except Exception:
+                pass
+
+            # Does the model exist locally?
+            # /api/show returns 200 if present, 404 if missing.
+            r2 = c.post(f"{OLLAMA_URL}/api/show", json={"name": OLLAMA_MODEL})
+            status["model_present"] = (r2.status_code == 200)
+    except Exception:
+        # Leave defaults (up=False, model_present=False)
+        pass
+
+    return status
