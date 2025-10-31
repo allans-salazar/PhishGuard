@@ -1,8 +1,7 @@
-run in terminal
+Run in Terminal:
 
-python3 -m venv .venv && source .venv/bin/activate
-
-uvicorn app:app --reload --port 8000
+% python3 -m venv .venv && source .venv/bin/activate
+% uvicorn app:app --reload --port 8000
 
 
 Whats venv?
@@ -20,7 +19,7 @@ Allowing us to:
 
 To exit the environment:
 
-deactivate
+% deactivate
 
 
 
