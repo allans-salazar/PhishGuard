@@ -12,7 +12,7 @@ export default function Login() {
     try {
       const res = await login(email.trim(), password);
       const role = (res?.role || "CUSTOMER").toUpperCase();
-      if (role === "PROVIDER") router.replace("/(tabs)/provider");
+      if (role === "PROVIDER") router.replace("/(provider)/");
       else router.replace("/(tabs)/catalog");
     } catch (e: any) {
       Alert.alert("Login failed", e?.response?.data?.detail || String(e));

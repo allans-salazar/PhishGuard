@@ -2,16 +2,19 @@
 import React, { useEffect, useState } from "react";
 import { Stack, Redirect } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
-import { loadToken } from "../src/api"; // uses SecureStore
+import { loadToken, loadRole } from "../src/api";
 
 export default function RootLayout() {
   const [ready, setReady] = useState(false);
-  const [authed, setAuthed] = useState(false);
+  const [token, setToken] = useState<string | null>(null);
+  const [role, setRole] = useState<string | null>(null);
 
   useEffect(() => {
     (async () => {
-      const token = await loadToken(); // PERSIST_SESSION=false -> usually null on cold launch
-      setAuthed(!!token);
+      const t = await loadToken();
+      const r = await loadRole();
+      setToken(t);
+      setRole(r?.toUpperCase?.() || null);
       setReady(true);
     })();
   }, []);
@@ -24,15 +27,31 @@ export default function RootLayout() {
     );
   }
 
-  // If not authenticated, force to /login inside (auth) group.
-  if (!authed) return <Redirect href="/(auth)/login" />;
+  // ❗NOT authenticated → MUST go to login
+  if (!token || !role) {
+    return (
+      <>
+        <Redirect href="/(auth)/login" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </>
+    );
+  }
 
-  // If authenticated, force to the tabs (catalog by default).
+  // Logged in as PROVIDER
+  if (role === "PROVIDER") {
+    return (
+      <>
+        <Redirect href="/(provider)/" />
+        <Stack screenOptions={{ headerShown: false }} />
+      </>
+    );
+  }
+
+  // Logged in as CUSTOMER
   return (
     <>
-      <Redirect href="/(tabs)/catalog" />
-      {/* The Stack still needs to exist so child routes render after redirect */}
-      <Stack screenOptions={{ headerShown: false }} />
+        <Redirect href="/(tabs)/catalog" />
+        <Stack screenOptions={{ headerShown: false }} />
     </>
   );
 }
