@@ -1,30 +1,47 @@
-import React, { useEffect, useState } from "react";
-import { View, Text, FlatList } from "react-native";
+// app/(provider)/modules.tsx
+import { View, Text, Button, ScrollView, TouchableOpacity } from "react-native";
+import { useEffect, useState } from "react";
 import { providerListModules } from "../../src/api";
+import { router } from "expo-router";
 
 export default function ProviderModules() {
   const [modules, setModules] = useState([]);
 
+  async function load() {
+    const data = await providerListModules();
+    setModules(data);
+  }
+
   useEffect(() => {
-    providerListModules().then(setModules).catch(console.error);
+    load();
   }, []);
 
   return (
-    <View style={{ flex: 1, padding: 20 }}>
-      <Text style={{ fontSize: 22, fontWeight: "600", marginBottom: 16 }}>
-        My Modules
-      </Text>
+    <ScrollView style={{ flex: 1, padding: 16 }}>
+      <Text style={{ fontSize: 24, fontWeight: "700" }}>My Modules</Text>
 
-      <FlatList
-        data={modules}
-        keyExtractor={(m) => m.id.toString()}
-        renderItem={({ item }) => (
-          <View style={{ padding: 12, borderBottomWidth: 1, borderColor: "#ddd" }}>
-            <Text style={{ fontWeight: "600" }}>{item.title}</Text>
-            <Text>{item.description}</Text>
-          </View>
-        )}
+      <Button
+        title="Create Module"
+        onPress={() => router.push("/(provider)/create")}
       />
-    </View>
+
+      {modules.map((m) => (
+        <TouchableOpacity
+          key={m.id}
+          onPress={() => router.push(`/(provider)/module-questions?moduleId=${m.id}`)}
+          style={{
+            marginTop: 16,
+            padding: 16,
+            borderWidth: 1,
+            borderRadius: 10,
+            backgroundColor: "#f3f3f3",
+          }}
+        >
+          <Text style={{ fontSize: 18, fontWeight: "600" }}>{m.title}</Text>
+          <Text>{m.description}</Text>
+          <Text style={{ marginTop: 4 }}>Price: {m.price}</Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
   );
 }

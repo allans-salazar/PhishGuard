@@ -2,12 +2,9 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-const BASE = "http://127.0.0.1:8000"; // change if needed (LAN IP for device)
+const BASE = "http://127.0.0.1:8000";
 const TOKEN_KEY = "phishguard_token";
 const ROLE_KEY = "phishguard_role";
-
-// Toggle this to control persistence across app launches.
-// false => user sees Login on every fresh launch (your current preference)
 const PERSIST_SESSION = false;
 
 const api = axios.create({
@@ -15,7 +12,9 @@ const api = axios.create({
   timeout: 8000,
 });
 
-/** ---------------- Token + Role helpers ---------------- */
+/* -------------------------------------------------------
+   TOKEN + ROLE HELPERS
+-------------------------------------------------------- */
 export async function saveToken(t: string) {
   await SecureStore.setItemAsync(TOKEN_KEY, t);
 }
@@ -41,9 +40,6 @@ export async function hasToken() {
   return !!t;
 }
 
-/** Set/remove header immediately (synchronous).
- *  Optionally persist/clear depending on PERSIST_SESSION.
- */
 export async function setAuthToken(token: string | null) {
   if (token) {
     api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
@@ -54,42 +50,42 @@ export async function setAuthToken(token: string | null) {
   }
 }
 
-/** For places where you want to hydrate header from storage (if persisting). */
 export async function setAuthHeaderFromStorage() {
   const t = await loadToken();
   if (t) api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
   else delete api.defaults.headers.common["Authorization"];
 }
 
-/** Convenience helpers for UI gating */
 export async function getRole(): Promise<"CUSTOMER" | "PROVIDER" | null> {
   const r = await loadRole();
   if (!r) return null;
   const up = r.toUpperCase();
-  return (up === "CUSTOMER" || up === "PROVIDER") ? (up as any) : null;
+  return up === "CUSTOMER" || up === "PROVIDER" ? (up as any) : null;
 }
 
-export async function getAuthStatus(): Promise<{ authenticated: boolean; role: "CUSTOMER" | "PROVIDER" | null }> {
-  const t = await loadToken();
-  const r = await getRole();
-  return { authenticated: !!t, role: r };
+export async function getAuthStatus() {
+  return {
+    authenticated: !!(await loadToken()),
+    role: await getRole(),
+  };
 }
 
-/** ---------------- Axios interceptors ---------------- */
-// If a 401 sneaks through (e.g., expired token during the session), throw a clean error.
+/* -------------------------------------------------------
+   AXIOS INTERCEPTOR
+-------------------------------------------------------- */
 api.interceptors.response.use(
   (res) => res,
-  async (err) => {
+  (err) => {
     if (err?.response?.status === 401) {
-      // Do NOT auto-logout here; just provide a clean message.
-      // Your UI can catch and redirect to Login.
       return Promise.reject(new Error("Not authenticated. Please log in."));
     }
     return Promise.reject(err);
   }
 );
 
-/** ---------------- Auth endpoints ---------------- */
+/* -------------------------------------------------------
+   AUTH
+-------------------------------------------------------- */
 export async function register(
   email: string,
   password: string,
@@ -98,44 +94,39 @@ export async function register(
   const { data } = await api.post("/auth/register", { email, password, role });
   if (data?.token) {
     await setAuthToken(data.token);
-    await saveRole((data.role || role).toUpperCase());
+    await saveRole(data.role.toUpperCase());
   }
-  return data as { token: string; role: "CUSTOMER" | "PROVIDER" };
+  return data;
 }
 
 export async function login(email: string, password: string) {
   const { data } = await api.post("/auth/login", { email, password });
   if (data?.token) {
     await setAuthToken(data.token);
-    await saveRole((data.role || "CUSTOMER").toUpperCase());
+    await saveRole(data.role.toUpperCase());
   }
-  return data as { token: string; role: "CUSTOMER" | "PROVIDER" };
+  return data;
 }
 
 export async function logout() {
   await setAuthToken(null);
   await removeRole();
-  // If PERSIST_SESSION=false (your default), there may be no token in storage anyway;
-  // this still clears axios header so next calls don’t leak auth.
 }
 
-/** ---------------- Catalog & Provider ---------------- */
-// Public catalog list (matches your FastAPI: GET /catalog/modules)
+/* -------------------------------------------------------
+   CATALOG
+-------------------------------------------------------- */
 export async function listCatalog() {
   const { data } = await api.get("/catalog/modules");
-  return data as {
-    id: number;
-    title: string;
-    description: string;
-    price: number;
-    provider_email: string;
-  }[];
+  return data;
 }
 
-// Provider: my modules (auth required)
+/* -------------------------------------------------------
+   PROVIDER: MODULES
+-------------------------------------------------------- */
 export async function providerListModules() {
   const { data } = await api.get("/provider/modules");
-  return data as { id: number; title: string; description: string; price: number }[];
+  return data;
 }
 
 export async function providerCreateModule(
@@ -144,55 +135,162 @@ export async function providerCreateModule(
   price: number
 ) {
   const { data } = await api.post("/provider/modules", { title, description, price });
-  return data as { id: number; ok: boolean };
+  return data;
 }
 
+export async function providerUpdateModule(
+  moduleId: number,
+  title: string,
+  description: string,
+  price: number
+) {
+  const { data } = await api.put(`/provider/modules/${moduleId}`, {
+    title,
+    description,
+    price,
+  });
+  return data;
+}
+
+export async function providerDeleteModule(moduleId: number) {
+  const { data } = await api.delete(`/provider/modules/${moduleId}`);
+  return data;
+}
+
+/* -------------------------------------------------------
+   PROVIDER: SCENARIOS
+-------------------------------------------------------- */
 export async function providerCreateScenario(
   moduleId: number,
   channel: "EMAIL" | "SMS" | "WEB",
-  prompt: string,
-  correct_choice: 0 | 1
+  prompt: string
 ) {
   const { data } = await api.post(`/provider/modules/${moduleId}/scenarios`, {
     channel,
     prompt,
-    correct_choice,
   });
-  return data as { id: number; ok: boolean };
+  return data;
 }
 
-/** ---------------- Wallet & Purchase ---------------- */
+export async function providerUpdateScenario(
+  scenarioId: number,
+  channel: string,
+  prompt: string
+) {
+  const { data } = await api.put(`/provider/scenarios/${scenarioId}`, {
+    channel,
+    prompt,
+  });
+  return data;
+}
+
+export async function providerDeleteScenario(scenarioId: number) {
+  const { data } = await api.delete(`/provider/scenarios/${scenarioId}`);
+  return data;
+}
+
+export async function providerListScenarios(moduleId: number) {
+  const { data } = await api.get(`/provider/modules/${moduleId}/scenarios`);
+  return data;
+}
+
+export async function providerGetScenario(scenarioId: number) {
+  const { data } = await api.get(`/provider/scenario/${scenarioId}`);
+  return data;
+}
+
+/* -------------------------------------------------------
+   PROVIDER: CHOICES
+-------------------------------------------------------- */
+export async function providerAddChoice(
+  scenarioId: number,
+  choice_text: string,
+  is_correct: number
+) {
+  const { data } = await api.post(`/provider/scenarios/${scenarioId}/choices`, {
+    choice_text,
+    is_correct,
+  });
+  return data;
+}
+
+export async function providerListChoices(scenarioId: number) {
+  const { data } = await api.get(`/provider/scenarios/${scenarioId}/choices`);
+  return data;
+}
+
+export async function providerGetChoice(choiceId: number) {
+  const { data } = await api.get(`/provider/choices/${choiceId}`);
+  return data;
+}
+
+export async function providerUpdateChoice(
+  choiceId: number,
+  choice_text: string,
+  is_correct: number
+) {
+  const { data } = await api.put(`/provider/choices/${choiceId}`, {
+    choice_text,
+    is_correct,
+  });
+  return data;
+}
+
+export async function providerDeleteChoice(choiceId: number) {
+  const { data } = await api.delete(`/provider/choices/${choiceId}`);
+  return data;
+}
+
+/* -------------------------------------------------------
+   WALLET & PURCHASE  (FIXED)
+-------------------------------------------------------- */
 export async function walletBalance() {
-  // ⛔️ If no token, don't call server at all (prevents 401 popups on first load)
-  const t = await loadToken();
-  if (!t) {
-    return { credits: 0 }; // or return null if you prefer
-  }
+  const token = await loadToken();
+  if (!token) return { credits: 0 };
+
   await setAuthHeaderFromStorage();
   const { data } = await api.get("/wallet/balance");
-  return data as { credits: number };
+  return data;
 }
 
 export async function walletTopup(amount: number) {
   const { data } = await api.post("/wallet/topup", { amount });
-  return data as { ok: true; credits: number };
+  return data;
 }
 
 export async function purchase(moduleId: number) {
   const { data } = await api.post(`/purchase/${moduleId}`);
-  return data as { ok: true; credits: number };
+  return data;
 }
 
-/** ---------------- AI (local Ollama via server) ---------------- */
+/* -------------------------------------------------------
+   TRAINING
+-------------------------------------------------------- */
+export async function fetchTrainingScenarios(moduleId: number) {
+  const { data } = await api.get(`/train/${moduleId}/scenarios`);
+  return data;
+}
+
+export async function submitAttempt(scenarioId: number, choiceId: number) {
+  const { data } = await api.post(`/train/attempt/${scenarioId}`, {
+    choice_id: choiceId,
+  });
+  return data;
+}
+
+/* -------------------------------------------------------
+   AI
+-------------------------------------------------------- */
 export async function askAI(question: string) {
   const { data } = await api.post("/ai/ask", { question });
-  return data as { answer: string };
+  return data;
 }
 
-/** Default export for convenience */
+/* -------------------------------------------------------
+   DEFAULT EXPORT
+-------------------------------------------------------- */
 export default {
   api,
-  // token & role helpers
   setAuthToken,
   setAuthHeaderFromStorage,
   saveToken,
@@ -204,19 +302,28 @@ export default {
   getRole,
   getAuthStatus,
   hasToken,
-  // auth
   login,
   register,
   logout,
-  // catalog & provider
   listCatalog,
   providerListModules,
   providerCreateModule,
+  providerUpdateModule,
+  providerDeleteModule,
   providerCreateScenario,
-  // wallet & purchase
+  providerUpdateScenario,
+  providerDeleteScenario,
+  providerListScenarios,
+  providerGetScenario,
+  providerAddChoice,
+  providerListChoices,
+  providerGetChoice,
+  providerUpdateChoice,
+  providerDeleteChoice,
   walletBalance,
   walletTopup,
   purchase,
-  // ai
+  fetchTrainingScenarios,
+  submitAttempt,
   askAI,
 };
