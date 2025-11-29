@@ -5,7 +5,6 @@ import * as SecureStore from "expo-secure-store";
 const BASE = "http://127.0.0.1:8000";
 const TOKEN_KEY = "phishguard_token";
 const ROLE_KEY = "phishguard_role";
-const PERSIST_SESSION = false;
 
 const api = axios.create({
   baseURL: BASE,
@@ -13,14 +12,42 @@ const api = axios.create({
 });
 
 /* -------------------------------------------------------
+   INTERNAL: Always load token into axios
+-------------------------------------------------------- */
+export async function applyAuthHeader() {
+  const t = await SecureStore.getItemAsync(TOKEN_KEY);
+  if (t) {
+    api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
+  } else {
+    delete api.defaults.headers.common["Authorization"];
+  }
+}
+
+export async function setAuthHeaderFromStorage() {
+  try {
+    const t = await SecureStore.getItemAsync(TOKEN_KEY);
+    if (t) {
+      api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
+    } else {
+      delete api.defaults.headers.common["Authorization"];
+    }
+  } catch (err) {
+    console.log("SecureStore read error:", err);
+    delete api.defaults.headers.common["Authorization"];
+  }
+}
+
+/* -------------------------------------------------------
    TOKEN + ROLE HELPERS
 -------------------------------------------------------- */
 export async function saveToken(t: string) {
   await SecureStore.setItemAsync(TOKEN_KEY, t);
 }
+
 export async function loadToken() {
   return await SecureStore.getItemAsync(TOKEN_KEY);
 }
+
 export async function removeToken() {
   await SecureStore.deleteItemAsync(TOKEN_KEY);
 }
@@ -28,32 +55,25 @@ export async function removeToken() {
 export async function saveRole(r: string) {
   await SecureStore.setItemAsync(ROLE_KEY, r);
 }
+
 export async function loadRole() {
   return await SecureStore.getItemAsync(ROLE_KEY);
 }
+
 export async function removeRole() {
   await SecureStore.deleteItemAsync(ROLE_KEY);
 }
 
-export async function hasToken() {
-  const t = await loadToken();
-  return !!t;
-}
-
+/* -------------------------------------------------------
+   AUTH TOKEN SETTER
+-------------------------------------------------------- */
 export async function setAuthToken(token: string | null) {
   if (token) {
-    api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-    if (PERSIST_SESSION) await saveToken(token);
+    await saveToken(token);
   } else {
-    delete api.defaults.headers.common["Authorization"];
-    if (PERSIST_SESSION) await removeToken();
+    await removeToken();
   }
-}
-
-export async function setAuthHeaderFromStorage() {
-  const t = await loadToken();
-  if (t) api.defaults.headers.common["Authorization"] = `Bearer ${t}`;
-  else delete api.defaults.headers.common["Authorization"];
+  await applyAuthHeader();
 }
 
 export async function getRole(): Promise<"CUSTOMER" | "PROVIDER" | null> {
@@ -105,6 +125,7 @@ export async function login(email: string, password: string) {
     await setAuthToken(data.token);
     await saveRole(data.role.toUpperCase());
   }
+  console.log("Saving role:", data.role);
   return data;
 }
 
@@ -117,42 +138,36 @@ export async function logout() {
    CATALOG
 -------------------------------------------------------- */
 export async function listCatalog() {
+  await applyAuthHeader();
   const { data } = await api.get("/catalog/modules");
   return data;
 }
 
 /* -------------------------------------------------------
-   PROVIDER: MODULES
+   PROVIDER
 -------------------------------------------------------- */
 export async function providerListModules() {
+  await applyAuthHeader();
   const { data } = await api.get("/provider/modules");
   return data;
 }
 
-export async function providerCreateModule(
-  title: string,
-  description: string,
-  price: number
-) {
+export async function providerCreateModule(title: string, description: string, price: number) {
+  await applyAuthHeader();
   const { data } = await api.post("/provider/modules", { title, description, price });
   return data;
 }
 
-export async function providerUpdateModule(
-  moduleId: number,
-  title: string,
-  description: string,
-  price: number
-) {
+export async function providerUpdateModule(moduleId: number, title: string, description: string, price: number) {
+  await applyAuthHeader();
   const { data } = await api.put(`/provider/modules/${moduleId}`, {
-    title,
-    description,
-    price,
+    title, description, price,
   });
   return data;
 }
 
 export async function providerDeleteModule(moduleId: number) {
+  await applyAuthHeader();
   const { data } = await api.delete(`/provider/modules/${moduleId}`);
   return data;
 }
@@ -160,11 +175,18 @@ export async function providerDeleteModule(moduleId: number) {
 /* -------------------------------------------------------
    PROVIDER: SCENARIOS
 -------------------------------------------------------- */
+export async function providerListScenarios(moduleId: number) {
+  await applyAuthHeader();
+  const { data } = await api.get(`/provider/modules/${moduleId}/scenarios`);
+  return data;
+}
+
 export async function providerCreateScenario(
   moduleId: number,
   channel: "EMAIL" | "SMS" | "WEB",
   prompt: string
 ) {
+  await applyAuthHeader();
   const { data } = await api.post(`/provider/modules/${moduleId}/scenarios`, {
     channel,
     prompt,
@@ -172,93 +194,52 @@ export async function providerCreateScenario(
   return data;
 }
 
-export async function providerUpdateScenario(
-  scenarioId: number,
-  channel: string,
-  prompt: string
-) {
-  const { data } = await api.put(`/provider/scenarios/${scenarioId}`, {
-    channel,
-    prompt,
-  });
-  return data;
-}
-
-export async function providerDeleteScenario(scenarioId: number) {
-  const { data } = await api.delete(`/provider/scenarios/${scenarioId}`);
-  return data;
-}
-
-export async function providerListScenarios(moduleId: number) {
-  const { data } = await api.get(`/provider/modules/${moduleId}/scenarios`);
-  return data;
-}
-
-export async function providerGetScenario(scenarioId: number) {
-  const { data } = await api.get(`/provider/scenario/${scenarioId}`);
-  return data;
-}
-
 /* -------------------------------------------------------
    PROVIDER: CHOICES
 -------------------------------------------------------- */
-export async function providerAddChoice(
-  scenarioId: number,
-  choice_text: string,
-  is_correct: number
-) {
-  const { data } = await api.post(`/provider/scenarios/${scenarioId}/choices`, {
-    choice_text,
-    is_correct,
+export async function providerAddChoice(sid: number, text: string, ok: number) {
+  await applyAuthHeader();
+  const { data } = await api.post(`/provider/scenarios/${sid}/choices`, {
+    choice_text: text,
+    is_correct: ok,
   });
   return data;
 }
 
-export async function providerListChoices(scenarioId: number) {
-  const { data } = await api.get(`/provider/scenarios/${scenarioId}/choices`);
-  return data;
-}
-
-export async function providerGetChoice(choiceId: number) {
-  const { data } = await api.get(`/provider/choices/${choiceId}`);
-  return data;
-}
-
-export async function providerUpdateChoice(
-  choiceId: number,
-  choice_text: string,
-  is_correct: number
-) {
-  const { data } = await api.put(`/provider/choices/${choiceId}`, {
-    choice_text,
-    is_correct,
-  });
-  return data;
-}
-
-export async function providerDeleteChoice(choiceId: number) {
-  const { data } = await api.delete(`/provider/choices/${choiceId}`);
+export async function providerListChoices(sid: number) {
+  await applyAuthHeader();
+  const { data } = await api.get(`/provider/scenarios/${sid}/choices`);
   return data;
 }
 
 /* -------------------------------------------------------
-   WALLET & PURCHASE  (FIXED)
+   PURCHASE HISTORY
+-------------------------------------------------------- */
+export async function listMyPurchases() {
+  await applyAuthHeader();
+  const { data } = await api.get("/purchases/mine");
+  return data.modules;
+}
+
+/* -------------------------------------------------------
+   WALLET
 -------------------------------------------------------- */
 export async function walletBalance() {
-  const token = await loadToken();
-  if (!token) return { credits: 0 };
-
-  await setAuthHeaderFromStorage();
+  await applyAuthHeader();
   const { data } = await api.get("/wallet/balance");
   return data;
 }
 
-export async function walletTopup(amount: number) {
-  const { data } = await api.post("/wallet/topup", { amount });
+export async function walletAddCard(card_number: string, exp: string, cvv: string) {
+  await applyAuthHeader();
+  const { data } = await api.post("/wallet/add_card", {
+    card_number, exp, cvv,
+  });
   return data;
 }
 
-export async function purchase(moduleId: number) {
+export async function purchaseModule(moduleId: number) {
+  await applyAuthHeader();
   const { data } = await api.post(`/purchase/${moduleId}`);
   return data;
 }
@@ -267,11 +248,13 @@ export async function purchase(moduleId: number) {
    TRAINING
 -------------------------------------------------------- */
 export async function fetchTrainingScenarios(moduleId: number) {
+  await applyAuthHeader();
   const { data } = await api.get(`/train/${moduleId}/scenarios`);
   return data;
 }
 
 export async function submitAttempt(scenarioId: number, choiceId: number) {
+  await applyAuthHeader();
   const { data } = await api.post(`/train/attempt/${scenarioId}`, {
     choice_id: choiceId,
   });
@@ -282,47 +265,40 @@ export async function submitAttempt(scenarioId: number, choiceId: number) {
    AI
 -------------------------------------------------------- */
 export async function askAI(question: string) {
+  await applyAuthHeader();
   const { data } = await api.post("/ai/ask", { question });
   return data;
 }
 
-/* -------------------------------------------------------
-   DEFAULT EXPORT
--------------------------------------------------------- */
 export default {
   api,
-  setAuthToken,
   setAuthHeaderFromStorage,
-  saveToken,
+  applyAuthHeader,
+  setAuthToken,
   loadToken,
+  saveToken,
   removeToken,
   saveRole,
   loadRole,
   removeRole,
   getRole,
   getAuthStatus,
-  hasToken,
   login,
   register,
   logout,
   listCatalog,
+  purchaseModule,
   providerListModules,
   providerCreateModule,
   providerUpdateModule,
   providerDeleteModule,
-  providerCreateScenario,
-  providerUpdateScenario,
-  providerDeleteScenario,
   providerListScenarios,
-  providerGetScenario,
+  providerCreateScenario,
   providerAddChoice,
   providerListChoices,
-  providerGetChoice,
-  providerUpdateChoice,
-  providerDeleteChoice,
+  listMyPurchases,
   walletBalance,
-  walletTopup,
-  purchase,
+  walletAddCard,
   fetchTrainingScenarios,
   submitAttempt,
   askAI,

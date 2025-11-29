@@ -444,6 +444,111 @@ def attempt_scenario(scenario_id: int, body: AttemptBody, user=Depends(get_curre
     return {"correct": is_correct}
 
 # ============================================================
+#               CUSTOMER: PURCHASE HISTORY
+# ============================================================
+
+@app.get("/purchases/mine")
+def purchases_mine(user=Depends(get_current_user)):
+    rows = query("""
+        SELECT module_id
+        FROM purchases
+        WHERE user_id = :u
+    """, {"u": user["id"]})
+
+    # return list like:  [41, 42, 55]
+    return {"modules": [int(r[0]) for r in rows]}
+
+@app.post("/purchase/{module_id}")
+def purchase_module(module_id: int, user=Depends(get_current_user)):
+    # Check module exists
+    price_row = query("SELECT price FROM modules WHERE id=:m", {"m": module_id})
+    if not price_row:
+        raise HTTPException(404, "Module not found")
+
+    price = float(price_row[0][0])
+
+    # Already purchased?
+    already = query("""
+        SELECT 1 FROM purchases
+        WHERE user_id = :u AND module_id = :m
+    """, {"u": user["id"], "m": module_id})
+
+    if already:
+        raise HTTPException(400, "Already purchased")
+
+    # Check wallet
+    wallet = query("""
+        SELECT credits FROM wallets WHERE user_id=:u
+    """, {"u": user["id"]})
+
+    if not wallet:
+        raise HTTPException(400, "Wallet not found")
+
+    credits = float(wallet[0][0])
+
+    if credits < price:
+        raise HTTPException(400, "Insufficient funds")
+
+    # Deduct credits
+    query("""
+        UPDATE wallets
+        SET credits = credits - :p
+        WHERE user_id=:u
+    """, {"p": price, "u": user["id"]}, commit=True)
+
+    # Add purchase
+    query("""
+        INSERT INTO purchases(user_id, module_id)
+        VALUES(:u, :m)
+    """, {"u": user["id"], "m": module_id}, commit=True)
+
+    return {"ok": True, "message": "Module purchased successfully"}
+
+# ============================================================
+#                     WALLET (REALISTIC SYSTEM)
+# ============================================================
+
+class AddCardBody(BaseModel):
+    card_number: str
+    exp: str
+    cvv: str
+
+@app.get("/wallet/balance")
+def wallet_balance(user=Depends(get_current_user)):
+    row = query("""
+        SELECT credits, has_card, last4
+        FROM wallets
+        WHERE user_id=:u
+    """, {"u": user["id"]})
+
+    if not row:
+        query("""
+            INSERT INTO wallets(user_id, credits, has_card, last4)
+            VALUES(:u, 0, 0, NULL)
+        """, {"u": user["id"]}, commit=True)
+        return {"credits": 0, "has_card": 0, "last4": None}
+
+    r = row[0]
+    return {
+        "credits": float(r[0]),
+        "has_card": int(r[1]),
+        "last4": r[2]
+    }
+
+@app.post("/wallet/add_card")
+def wallet_add_card(body: AddCardBody, user=Depends(get_current_user)):
+    last4 = body.card_number[-4:]
+
+    query("""
+        UPDATE wallets
+        SET has_card=1, last4=:l, credits=50
+        WHERE user_id=:u
+    """, {"l": last4, "u": user["id"]}, commit=True)
+
+    return {"ok": True, "credits": 50, "last4": last4}
+
+
+# ============================================================
 #                     AI
 # ============================================================
 

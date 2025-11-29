@@ -47,8 +47,12 @@ def user_role(uid: int) -> str:
 
 
 def make_jwt(uid: int, role: str) -> str:
-    payload = {"uid": uid, "role": role, "iat": int(time.time())}
-    return jwt.encode(payload, JWT_SECRET, algorithm="HS256")
+    payload = {
+        "uid": uid,
+        "role": role,
+        "iat": int(time.time())
+    }
+    return jose_jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGO)
 
 # --- TOKEN DECODING & AUTH DEPENDENCIES ---
 
@@ -56,8 +60,8 @@ def decode_jwt(token: str) -> Dict[str, Any]:
     try:
         payload = jose_jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGO])
         return payload
-    except JWTError as e:
-        raise HTTPException(status_code=401, detail="Invalid token") from e
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Invalid token")
 
 
 def get_current_user(creds: HTTPAuthorizationCredentials = Depends(bearer_scheme)) -> Dict[str, Any]:

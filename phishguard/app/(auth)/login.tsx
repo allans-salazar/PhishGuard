@@ -1,46 +1,76 @@
-// app/(auth)/login.tsx
 import React, { useState } from "react";
-import { View, TextInput, Button, Text, Alert } from "react-native";
-import { router, Link } from "expo-router";
-import { login } from "../../src/api";
+import { View, Text, TextInput, Button, Alert } from "react-native";
+import { login, loadRole } from "../../src/api";
+import { router } from "expo-router";
 
 export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
-  async function onLogin() {
+  async function doLogin() {
     try {
-      const res = await login(email.trim(), password);
-      const role = (res?.role || "CUSTOMER").toUpperCase();
-      if (role === "PROVIDER") router.replace("/(provider)/");
+      await login(email, password);
+      const role = await loadRole();
+
+      if (role === "PROVIDER") router.replace("/(provider)");
       else router.replace("/(tabs)/catalog");
     } catch (e: any) {
-      Alert.alert("Login failed", e?.response?.data?.detail || String(e));
+      Alert.alert("Error", e.message || "Login failed");
     }
   }
 
   return (
-    <View style={{ flex: 1, padding: 20, gap: 12, justifyContent: "center" }}>
-      <Text style={{ fontSize: 22, fontWeight: "600", marginBottom: 12 }}>Welcome back</Text>
+    <View
+      style={{
+        flex: 1,
+        justifyContent: "center",
+        paddingHorizontal: 25,
+        backgroundColor: "#fff",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 32,
+          fontWeight: "700",
+          textAlign: "center",
+          marginBottom: 30,
+        }}
+      >
+        Login
+      </Text>
+
       <TextInput
         placeholder="Email"
-        autoCapitalize="none"
-        keyboardType="email-address"
         value={email}
         onChangeText={setEmail}
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 10, borderRadius: 8 }}
+        autoCapitalize="none"
+        keyboardType="email-address"
+        style={{
+          borderWidth: 1,
+          borderColor: "#ccc",
+          padding: 15,
+          borderRadius: 8,
+          marginBottom: 20,
+          fontSize: 16,
+        }}
       />
+
       <TextInput
         placeholder="Password"
         secureTextEntry
         value={password}
         onChangeText={setPassword}
-        style={{ borderWidth: 1, borderColor: "#ccc", padding: 10, borderRadius: 8 }}
+        style={{
+          borderWidth: 1,
+          borderColor: "#ccc",
+          padding: 15,
+          borderRadius: 8,
+          marginBottom: 30,
+          fontSize: 16,
+        }}
       />
-      <Button title="Login" onPress={onLogin} />
-      <Text style={{ textAlign: "center", marginTop: 16 }}>
-        New here? <Link href="/(auth)/register">Create an account</Link>
-      </Text>
+
+      <Button title="Login" onPress={doLogin} />
     </View>
   );
 }

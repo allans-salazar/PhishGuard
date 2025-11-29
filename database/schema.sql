@@ -22,4 +22,7 @@ CREATE TABLE wallets (
   credits NUMBER DEFAULT 0
 );
 
+ALTER TABLE wallets ADD has_card NUMBER(1) DEFAULT 0;
+ALTER TABLE wallets ADD last4 VARCHAR2(4);
+
 COMMIT;
