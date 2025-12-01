@@ -1,57 +1,77 @@
 // app/train/[moduleId].tsx
 import React, { useEffect, useState } from "react";
-import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
 import { getTrainingScenarios, attemptScenario } from "../../src/api";
 
 export default function ModuleQuestions() {
-  // read route param
   const { moduleId } = useLocalSearchParams();
-  console.log("MODULE ID PARAM:", moduleId);
-
-  const id = Number(moduleId);
+  const numericId = Number(moduleId);
 
   const [scenarios, setScenarios] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [answerState, setAnswerState] = useState<any>({});
+  const [showResults, setShowResults] = useState(false);
 
   async function load() {
     try {
-      if (!moduleId || isNaN(id)) {
-        console.log("INVALID MODULE ID:", moduleId);
-        Alert.alert("Error", "Invalid module selected.");
-        return;
-      }
-
-      const data = await getTrainingScenarios(id);
+      setLoading(true);
+      const data = await getTrainingScenarios(numericId);
       setScenarios(data);
-    } catch (err) {
-      console.log("Failed to load module:", err);
-      Alert.alert("Unable to load training module");
+      setAnswerState({});
+      setShowResults(false);
+    } catch (e) {
+      console.log("Failed to load module:", e);
     }
     setLoading(false);
   }
 
   useEffect(() => {
     load();
-  }, [moduleId]);
+  }, []);
 
-  async function pickChoice(scenarioId: number, choiceId: number) {
+  async function handleAnswer(scenarioId: number, choiceId: number) {
+    // Prevent multiple attempts
+    if (answerState[scenarioId]) return;
+
     try {
       const res = await attemptScenario(scenarioId, choiceId);
 
-      if (res.correct) {
-        Alert.alert("Correct!", "Good job! That was the right choice.");
-      } else {
-        Alert.alert("Incorrect", "This was not the correct answer. Try again!");
-      }
-    } catch (err) {
-      console.log(err);
-      Alert.alert("Error", "Failed to submit answer.");
+      setAnswerState((prev: any) => ({
+        ...prev,
+        [scenarioId]: {
+          selected: choiceId,
+          correct: res.correct,
+        },
+      }));
+    } catch (e) {
+      console.log("Error answering:", e);
     }
   }
 
-  if (loading) {
+  // Compute results
+  function computeResults() {
+    const total = scenarios.length;
+    const answered = Object.keys(answerState).length;
+    const correct = Object.values(answerState).filter((x: any) => x.correct).length;
+
+    const score = correct / total;
+    return {
+      total,
+      answered,
+      correct,
+      passed: score >= 0.7,
+    };
+  }
+
+  if (loading)
     return (
       <SafeAreaView
         style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
@@ -59,54 +79,152 @@ export default function ModuleQuestions() {
         <ActivityIndicator size="large" />
       </SafeAreaView>
     );
-  }
 
-  return (
-    <SafeAreaView style={{ flex: 1, padding: 20, backgroundColor: "#fff" }}>
-      <TouchableOpacity onPress={() => router.back()}>
-        <Text style={{ fontSize: 16, color: "#3498db" }}>← Back</Text>
-      </TouchableOpacity>
+  const results = computeResults();
 
-      <Text style={{ fontSize: 26, fontWeight: "700", marginBottom: 20 }}>
-        Module Questions
-      </Text>
+  // =============================
+  // RESULTS SCREEN
+  // =============================
+  if (showResults) {
+    return (
+      <SafeAreaView
+        style={{
+          flex: 1,
+          backgroundColor: "#fff",
+          justifyContent: "center",
+          padding: 25,
+        }}
+      >
+        <Text
+          style={{ fontSize: 28, fontWeight: "700", textAlign: "center", marginBottom: 30 }}
+        >
+          Results
+        </Text>
 
-      {scenarios.map((s) => (
-        <View
-          key={s.id}
+        <Text style={{ fontSize: 22, textAlign: "center", marginBottom: 10 }}>
+          Score: {results.correct}/{results.total}
+        </Text>
+
+        <Text
           style={{
-            padding: 15,
-            borderWidth: 1,
-            borderColor: "#ccc",
-            borderRadius: 10,
-            marginBottom: 20,
+            fontSize: 26,
+            fontWeight: "700",
+            textAlign: "center",
+            color: results.passed ? "green" : "red",
+            marginBottom: 40,
           }}
         >
-          <Text style={{ fontSize: 20, fontWeight: "600" }}>
-            {s.channel} Scenario
-          </Text>
-          <Text style={{ marginTop: 10 }}>{s.prompt}</Text>
+          {results.passed ? "PASS" : "FAIL"}
+        </Text>
 
-          <Text style={{ marginTop: 15, fontWeight: "700", fontSize: 16 }}>
-            Choices:
+        <TouchableOpacity
+          onPress={() => load()}
+          style={{
+            backgroundColor: "#3498db",
+            padding: 15,
+            borderRadius: 8,
+            marginBottom: 15,
+          }}
+        >
+          <Text style={{ color: "#fff", textAlign: "center", fontSize: 18 }}>
+            Try Again
           </Text>
+        </TouchableOpacity>
 
-          {s.choices.map((c) => (
-            <TouchableOpacity
-              key={c.id}
+        <TouchableOpacity
+          onPress={() => router.replace("/(tabs)/train")}
+          style={{
+            backgroundColor: "#2ecc71",
+            padding: 15,
+            borderRadius: 8,
+          }}
+        >
+          <Text style={{ color: "#fff", textAlign: "center", fontSize: 18 }}>
+            Go Back Home
+          </Text>
+        </TouchableOpacity>
+      </SafeAreaView>
+    );
+  }
+
+  // =============================
+  // QUESTIONS SCREEN
+  // =============================
+  return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
+      <ScrollView contentContainerStyle={{ padding: 20 }}>
+        <Text style={{ fontSize: 28, fontWeight: "700", marginBottom: 20 }}>
+          Training Questions
+        </Text>
+
+        {scenarios.map((sc, index) => {
+          const state = answerState[sc.id];
+
+          return (
+            <View
+              key={sc.id}
               style={{
-                marginTop: 10,
-                padding: 12,
-                backgroundColor: "#e8e8e8",
-                borderRadius: 6,
+                marginBottom: 30,
+                padding: 15,
+                borderWidth: 1,
+                borderRadius: 10,
+                borderColor: "#ccc",
               }}
-              onPress={() => pickChoice(s.id, c.id)}
             >
-              <Text>{c.text}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      ))}
+              <Text
+                style={{
+                  fontSize: 20,
+                  fontWeight: "700",
+                  marginBottom: 10,
+                }}
+              >
+                {index + 1}. {sc.prompt}
+              </Text>
+
+              {sc.choices.map((c: any) => {
+                let bg = "#eee";
+
+                if (state) {
+                  if (state.selected === c.id) {
+                    bg = state.correct ? "#2ecc71" : "#e74c3c"; // green or red
+                  }
+                }
+
+                return (
+                  <TouchableOpacity
+                    key={c.id}
+                    onPress={() => handleAnswer(sc.id, c.id)}
+                    style={{
+                      padding: 12,
+                      backgroundColor: bg,
+                      borderRadius: 8,
+                      marginVertical: 6,
+                    }}
+                  >
+                    <Text style={{ fontSize: 16 }}>{c.text}</Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          );
+        })}
+
+        {/* FINISH BUTTON */}
+        <TouchableOpacity
+          onPress={() => setShowResults(true)}
+          style={{
+            backgroundColor: "#8e44ad",
+            padding: 15,
+            borderRadius: 10,
+            marginTop: 25,
+            marginBottom: 50,
+          }}
+        >
+          <Text style={{ color: "#fff", textAlign: "center", fontSize: 18 }}>
+            Finished?
+          </Text>
+        </TouchableOpacity>
+      </ScrollView>
     </SafeAreaView>
   );
 }
