@@ -1,36 +1,55 @@
-// app/(tabs)/train/[moduleID].tsx
+// app/train/[moduleId].tsx
 import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
-  Alert,
-} from "react-native";
+import { View, Text, TouchableOpacity, ActivityIndicator, Alert } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, router } from "expo-router";
-import { fetchTrainingScenarios, submitAttempt } from "../../src/api";
+import { getTrainingScenarios, attemptScenario } from "../../src/api";
 
 export default function ModuleQuestions() {
-  const { moduleID } = useLocalSearchParams();
-  const moduleIdNum = Number(moduleID);
+  // read route param
+  const { moduleId } = useLocalSearchParams();
+  console.log("MODULE ID PARAM:", moduleId);
+
+  const id = Number(moduleId);
 
   const [scenarios, setScenarios] = useState<any[]>([]);
-  const [index, setIndex] = useState(0);
   const [loading, setLoading] = useState(true);
 
   async function load() {
-    setLoading(true);
-    const data = await fetchTrainingScenarios(moduleIdNum);
-    setScenarios(data);
-    setIndex(0);
+    try {
+      if (!moduleId || isNaN(id)) {
+        console.log("INVALID MODULE ID:", moduleId);
+        Alert.alert("Error", "Invalid module selected.");
+        return;
+      }
+
+      const data = await getTrainingScenarios(id);
+      setScenarios(data);
+    } catch (err) {
+      console.log("Failed to load module:", err);
+      Alert.alert("Unable to load training module");
+    }
     setLoading(false);
   }
 
   useEffect(() => {
     load();
-  }, [moduleID]);
+  }, [moduleId]);
+
+  async function pickChoice(scenarioId: number, choiceId: number) {
+    try {
+      const res = await attemptScenario(scenarioId, choiceId);
+
+      if (res.correct) {
+        Alert.alert("Correct!", "Good job! That was the right choice.");
+      } else {
+        Alert.alert("Incorrect", "This was not the correct answer. Try again!");
+      }
+    } catch (err) {
+      console.log(err);
+      Alert.alert("Error", "Failed to submit answer.");
+    }
+  }
 
   if (loading) {
     return (
@@ -42,100 +61,52 @@ export default function ModuleQuestions() {
     );
   }
 
-  if (scenarios.length === 0) {
-    return (
-      <SafeAreaView
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          paddingHorizontal: 20,
-        }}
-      >
-        <Text style={{ textAlign: "center", fontSize: 22 }}>
-          This module has no scenarios yet.
-        </Text>
-      </SafeAreaView>
-    );
-  }
-
-  const current = scenarios[index];
-
-  async function selectChoice(choiceId: number) {
-    const res = await submitAttempt(current.id, choiceId);
-
-    if (!res.correct) {
-      Alert.alert("Incorrect", "That is not the correct answer.");
-      return;
-    }
-
-    // Correct → move next
-    if (index === scenarios.length - 1) {
-      Alert.alert("Module Complete", "Nice! You finished this module.", [
-        {
-          text: "Go Back",
-          onPress: () => router.back(),
-        },
-      ]);
-    } else {
-      setIndex(index + 1);
-    }
-  }
-
   return (
-    <SafeAreaView
-      style={{
-        flex: 1,
-        backgroundColor: "#fff",
-        paddingTop: 10,
-        paddingHorizontal: 20,
-      }}
-    >
-      <ScrollView showsVerticalScrollIndicator={false}>
-        <Text style={{ fontSize: 26, fontWeight: "700", marginBottom: 10 }}>
-          Question {index + 1} of {scenarios.length}
-        </Text>
+    <SafeAreaView style={{ flex: 1, padding: 20, backgroundColor: "#fff" }}>
+      <TouchableOpacity onPress={() => router.back()}>
+        <Text style={{ fontSize: 16, color: "#3498db" }}>← Back</Text>
+      </TouchableOpacity>
 
-        <Text
+      <Text style={{ fontSize: 26, fontWeight: "700", marginBottom: 20 }}>
+        Module Questions
+      </Text>
+
+      {scenarios.map((s) => (
+        <View
+          key={s.id}
           style={{
-            fontSize: 20,
+            padding: 15,
+            borderWidth: 1,
+            borderColor: "#ccc",
+            borderRadius: 10,
             marginBottom: 20,
-            lineHeight: 28,
-            color: "#444",
           }}
         >
-          {current.prompt}
-        </Text>
+          <Text style={{ fontSize: 20, fontWeight: "600" }}>
+            {s.channel} Scenario
+          </Text>
+          <Text style={{ marginTop: 10 }}>{s.prompt}</Text>
 
-        {current.choices.map((c: any) => (
-          <TouchableOpacity
-            key={c.id}
-            onPress={() => selectChoice(c.id)}
-            style={{
-              padding: 15,
-              backgroundColor: "#f3f3f3",
-              borderRadius: 10,
-              marginBottom: 12,
-              borderWidth: 1,
-              borderColor: "#ccc",
-            }}
-          >
-            <Text style={{ fontSize: 18 }}>{c.text}</Text>
-          </TouchableOpacity>
-        ))}
+          <Text style={{ marginTop: 15, fontWeight: "700", fontSize: 16 }}>
+            Choices:
+          </Text>
 
-        <TouchableOpacity
-          style={{
-            marginTop: 25,
-            padding: 12,
-            backgroundColor: "#3498db",
-            borderRadius: 8,
-            alignSelf: "flex-start",
-          }}
-          onPress={() => router.back()}
-        >
-          <Text style={{ fontSize: 16, color: "white" }}>← Back</Text>
-        </TouchableOpacity>
-      </ScrollView>
+          {s.choices.map((c) => (
+            <TouchableOpacity
+              key={c.id}
+              style={{
+                marginTop: 10,
+                padding: 12,
+                backgroundColor: "#e8e8e8",
+                borderRadius: 6,
+              }}
+              onPress={() => pickChoice(s.id, c.id)}
+            >
+              <Text>{c.text}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      ))}
     </SafeAreaView>
   );
 }

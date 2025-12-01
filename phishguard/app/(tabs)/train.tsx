@@ -5,7 +5,6 @@ import {
   Text,
   TouchableOpacity,
   ActivityIndicator,
-  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { listCatalog, listMyPurchases } from "../../src/api";
@@ -23,7 +22,6 @@ export default function Train() {
       listMyPurchases(),
     ]);
 
-    // Only show modules the customer purchased
     const filtered = mods.filter((m) => purchased.includes(Number(m.id)));
 
     setModules(filtered);
@@ -36,14 +34,7 @@ export default function Train() {
 
   if (loading) {
     return (
-      <SafeAreaView
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: "#fff",
-        }}
-      >
+      <SafeAreaView style={{ flex: 1, justifyContent: "center", alignItems: "center" }}>
         <ActivityIndicator size="large" />
       </SafeAreaView>
     );
@@ -55,8 +46,8 @@ export default function Train() {
         style={{
           flex: 1,
           paddingHorizontal: 20,
+          paddingTop: 20,
           justifyContent: "center",
-          backgroundColor: "#fff",
         }}
       >
         <Text style={{ fontSize: 22, textAlign: "center" }}>
@@ -71,7 +62,7 @@ export default function Train() {
       style={{
         flex: 1,
         paddingHorizontal: 20,
-        paddingTop: 10,
+        paddingTop: 20,
         backgroundColor: "#fff",
       }}
     >
@@ -79,27 +70,28 @@ export default function Train() {
         Your Training Modules
       </Text>
 
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {modules.map((m) => (
-          <TouchableOpacity
-            key={m.id}
-            onPress={() => router.push(`/train/${m.id}`)}
-            style={{
-              padding: 16,
-              marginBottom: 12,
-              borderWidth: 1,
-              borderRadius: 12,
-              backgroundColor: "#d4ffd4",
-              borderColor: "#2ecc71",
-            }}
-          >
-            <Text style={{ fontSize: 20, fontWeight: "600" }}>{m.title}</Text>
-            <Text style={{ marginTop: 6, fontSize: 15, color: "#555" }}>
-              {m.description}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
+      {modules.map((m) => (
+        <TouchableOpacity
+          key={m.id}
+          onPress={() =>
+            router.push({
+              pathname: "/train/[moduleId]",
+              params: { moduleId: String(m.id) },
+            })
+          }
+          style={{
+            padding: 15,
+            marginVertical: 10,
+            borderWidth: 1,
+            borderRadius: 10,
+            backgroundColor: "#d4ffd4",
+            borderColor: "#2ecc71",
+          }}
+        >
+          <Text style={{ fontSize: 20, fontWeight: "600" }}>{m.title}</Text>
+          <Text style={{ marginTop: 6, fontSize: 15 }}>{m.description}</Text>
+        </TouchableOpacity>
+      ))}
     </SafeAreaView>
   );
 }

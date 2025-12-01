@@ -261,6 +261,18 @@ export async function submitAttempt(scenarioId: number, choiceId: number) {
   return data;
 }
 
+export async function getTrainingScenarios(moduleId: number) {
+  const res = await api.get(`/train/${moduleId}/scenarios`);
+  return res.data;
+}
+
+export async function attemptScenario(scenarioId: number, choiceId: number) {
+  const res = await api.post(`/train/attempt/${scenarioId}`, {
+    choice_id: choiceId,
+  });
+  return res.data;
+}
+
 /* -------------------------------------------------------
    AI
 -------------------------------------------------------- */
@@ -300,6 +312,8 @@ export default {
   walletBalance,
   walletAddCard,
   fetchTrainingScenarios,
+  getTrainingScenarios,
+  attemptScenario,
   submitAttempt,
   askAI,
 };
