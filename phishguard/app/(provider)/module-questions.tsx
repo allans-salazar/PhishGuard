@@ -104,7 +104,7 @@ export default function ModuleQuestions() {
             <Button
               title="Edit"
               onPress={() =>
-                router.push(`/(provider)/add-scenario?scenarioId=${sc.id}`)
+                router.push(`/(provider)/add-scenario?scenarioId=${sc.id}&moduleId=${mid}`)
               }
             />
             <Button
@@ -137,7 +137,7 @@ export default function ModuleQuestions() {
                   title="Edit"
                   onPress={() =>
                     router.push(
-                      `/(provider)/add-choice?scenarioId=${sc.id}&choiceId=${c.id}`
+                      `/(provider)/add-choice?scenarioId=${sc.id}&choiceId=${c.id}&moduleId=${mid}`
                     )
                   }
                 />
@@ -153,7 +153,7 @@ export default function ModuleQuestions() {
           <Button
             title="Add Choice"
             onPress={() =>
-              router.push(`/(provider)/add-choice?scenarioId=${sc.id}`)
+              router.push(`/(provider)/add-choice?scenarioId=${sc.id}&moduleId=${mid}`)
             }
           />
         </View>

@@ -1,4 +1,3 @@
-// app/(provider)/add-choice.tsx
 import React, { useEffect, useState } from "react";
 import { View, Text, TextInput, Switch, Button, Alert } from "react-native";
 import { useLocalSearchParams, router } from "expo-router";
@@ -10,10 +9,9 @@ import {
 
 export default function AddChoice() {
   const { scenarioId, choiceId, moduleId } = useLocalSearchParams();
-
   const sid = Number(scenarioId);
   const cid = choiceId ? Number(choiceId) : null;
-  const mid = Number(moduleId); // 🔥 needed for redirect refresh
+  const mid = Number(moduleId);
 
   const [choiceText, setChoiceText] = useState("");
   const [isCorrect, setIsCorrect] = useState(false);
@@ -31,22 +29,21 @@ export default function AddChoice() {
   }
 
   async function save() {
-    try {
-      if (cid) {
-        await providerUpdateChoice(cid, choiceText, isCorrect ? 1 : 0);
-        Alert.alert("Updated", "Choice updated.");
-      } else {
-        await providerAddChoice(sid, choiceText, isCorrect ? 1 : 0);
-        Alert.alert("Added", "Choice created.");
-      }
-
-      // 🔥 IMMEDIATELY refresh the full scenario + choices list
-      router.replace(`/(provider)/module-questions?moduleId=${mid}`);
-
-    } catch (e: any) {
-      Alert.alert("Error", String(e.message || e));
+  try {
+    if (cid) {
+      await providerUpdateChoice(cid, choiceText, isCorrect ? 1 : 0);
+      Alert.alert("Updated", "Choice updated.");
+    } else {
+      await providerAddChoice(sid, choiceText, isCorrect ? 1 : 0);
+      Alert.alert("Added", "Choice created.");
     }
+
+    router.back();   // ← Return to module-questions
+
+  } catch (e: any) {
+    Alert.alert("Error", String(e.message || e));
   }
+}
 
   useEffect(() => {
     loadChoice();
