@@ -1,13 +1,14 @@
 // app/(provider)/module-questions.tsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import { View, Text, Button, Alert, ScrollView } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
+import { useLocalSearchParams, router, useFocusEffect } from "expo-router";
 import {
   providerListScenarios,
   providerDeleteScenario,
   providerListChoices,
   providerDeleteChoice,
 } from "../../src/api";
+import { useCallback } from "react";
 
 export default function ModuleQuestions() {
   const { moduleId } = useLocalSearchParams();
@@ -62,9 +63,12 @@ export default function ModuleQuestions() {
     ]);
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  // 🔥 Auto-refresh when returning to this screen
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
 
   if (loading) return <Text>Loading...</Text>;
 

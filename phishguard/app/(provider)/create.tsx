@@ -11,10 +11,14 @@ export default function CreateModule() {
 
   async function submit() {
     try {
-      const p = parseFloat(price);
+      const p = parseFloat(price || "0");
+
       await providerCreateModule(title, desc, p);
+
       Alert.alert("Success", "Module created!");
-      router.back();
+
+      // 🔥 Immediately refresh module list by replacing the route
+      router.replace("/(provider)/modules");
     } catch (e: any) {
       Alert.alert("Error", String(e.message || e));
     }

@@ -9,20 +9,26 @@ export default function ProviderLayout() {
     (async () => {
       const t = await loadToken();
       const r = await loadRole();
-      setAllow(t && r === "PROVIDER");
+      setAllow(!!t && r === "PROVIDER"); // ensure boolean
     })();
   }, []);
 
+  // still loading
   if (allow === null) return null;
-  if (!allow) return <Redirect href="/(auth)/login" />;
 
+  // block access if not provider
+  if (!allow) {
+    return <Redirect href="/(auth)/login" />;
+  }
+
+  // allowed → show provider stack
   return (
-  <Stack
-    screenOptions={{
-      headerShown: true,
-      headerTitleAlign: "center",
-      headerStyle: { backgroundColor: "#f9f9f9" },
-    }}
-  />
-);
+    <Stack
+      screenOptions={{
+        headerShown: true,
+        headerTitleAlign: "center",
+        headerStyle: { backgroundColor: "#f9f9f9" },
+      }}
+    />
+  );
 }

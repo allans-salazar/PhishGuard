@@ -38,7 +38,9 @@ export default function AddScenario() {
         Alert.alert("Created", "Scenario created.");
       }
 
-      router.back();
+      // 🔥 Force module-questions screen to refresh immediately
+      router.replace(`/(provider)/module-questions?moduleId=${mid}`);
+
     } catch (e: any) {
       Alert.alert("Error", String(e.message || e));
     }
@@ -67,7 +69,7 @@ export default function AddScenario() {
         value={prompt}
         multiline
         onChangeText={setPrompt}
-        style={{ borderWidth: 1, padding: 10, borderRadius: 8 }}
+        style={{ borderWidth: 1, padding: 10, borderRadius: 8, minHeight: 80 }}
       />
 
       <Button title={sid ? "Save Changes" : "Create Scenario"} onPress={save} />

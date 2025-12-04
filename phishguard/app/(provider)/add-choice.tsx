@@ -9,9 +9,11 @@ import {
 } from "../../src/api";
 
 export default function AddChoice() {
-  const { scenarioId, choiceId } = useLocalSearchParams();
+  const { scenarioId, choiceId, moduleId } = useLocalSearchParams();
+
   const sid = Number(scenarioId);
   const cid = choiceId ? Number(choiceId) : null;
+  const mid = Number(moduleId); // 🔥 needed for redirect refresh
 
   const [choiceText, setChoiceText] = useState("");
   const [isCorrect, setIsCorrect] = useState(false);
@@ -37,7 +39,10 @@ export default function AddChoice() {
         await providerAddChoice(sid, choiceText, isCorrect ? 1 : 0);
         Alert.alert("Added", "Choice created.");
       }
-      router.back();
+
+      // 🔥 IMMEDIATELY refresh the full scenario + choices list
+      router.replace(`/(provider)/module-questions?moduleId=${mid}`);
+
     } catch (e: any) {
       Alert.alert("Error", String(e.message || e));
     }

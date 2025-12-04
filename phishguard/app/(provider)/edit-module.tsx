@@ -1,7 +1,9 @@
 // app/(provider)/edit-module.tsx
 import React, { useState, useEffect } from "react";
 import { View, TextInput, Button, Text, Alert } from "react-native";
-import { useLocalSearchParams, router, Link } from "expo-router";
+import { useLocalSearchParams, router, Link, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
+
 import {
   providerListModules,
   providerUpdateModule,
@@ -13,19 +15,33 @@ export default function EditModule() {
   const moduleId = Number(id);
 
   const [mod, setMod] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
   // Load the module details
   async function load() {
+    setLoading(true);
+
     const all = await providerListModules();
     const found = all.find((m) => m.id === moduleId);
+
     setMod(found);
+    setLoading(false);
   }
+
+  // Auto-refresh module when returning to this screen
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
 
   // Save (update) module
   async function save() {
     try {
       await providerUpdateModule(moduleId, mod.title, mod.description, mod.price);
       Alert.alert("Saved", "Module updated successfully");
+
+      // Refresh module list on previous screen
       router.back();
     } catch (e: any) {
       Alert.alert("Error", String(e.message || e));
@@ -45,6 +61,7 @@ export default function EditModule() {
           onPress: async () => {
             try {
               await providerDeleteModule(moduleId);
+
               Alert.alert("Deleted", "Module removed");
               router.replace("/(provider)/modules");
             } catch (e: any) {
@@ -56,11 +73,7 @@ export default function EditModule() {
     );
   }
 
-  useEffect(() => {
-    load();
-  }, []);
-
-  if (!mod) return <Text>Loading...</Text>;
+  if (loading || !mod) return <Text>Loading...</Text>;
 
   return (
     <View style={{ flex: 1, padding: 20, gap: 12 }}>

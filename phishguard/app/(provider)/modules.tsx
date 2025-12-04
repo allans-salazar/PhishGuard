@@ -1,8 +1,9 @@
 // app/(provider)/modules.tsx
 import { View, Text, Button, ScrollView, TouchableOpacity } from "react-native";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { providerListModules } from "../../src/api";
-import { router } from "expo-router";
+import { router, useFocusEffect } from "expo-router";
+import { useCallback } from "react";
 
 export default function ProviderModules() {
   const [modules, setModules] = useState([]);
@@ -12,9 +13,12 @@ export default function ProviderModules() {
     setModules(data);
   }
 
-  useEffect(() => {
-    load();
-  }, []);
+  // 🔥 Auto-refresh every time page becomes active
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
 
   return (
     <ScrollView style={{ flex: 1, padding: 16 }}>
@@ -28,7 +32,9 @@ export default function ProviderModules() {
       {modules.map((m) => (
         <TouchableOpacity
           key={m.id}
-          onPress={() => router.push(`/(provider)/module-questions?moduleId=${m.id}`)}
+          onPress={() =>
+            router.push(`/(provider)/module-questions?moduleId=${m.id}`)
+          }
           style={{
             marginTop: 16,
             padding: 16,
