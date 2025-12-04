@@ -1,5 +1,13 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, TextInput, Button, Alert } from "react-native";
+import {
+  View,
+  Text,
+  TextInput,
+  Button,
+  Alert,
+  ActivityIndicator,
+} from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { walletBalance, walletAddCard } from "../../src/api";
 
 export default function WalletScreen() {
@@ -26,16 +34,16 @@ export default function WalletScreen() {
     try {
       const res = await walletAddCard(card, exp, cvv);
 
-      // ⬅️ Immediately update wallet state with new info
+      // Update wallet immediately
       setWallet({
         credits: 50,
         has_card: true,
         last4: card.slice(-4),
       });
 
-      Alert.alert("Card Added", "You have received $50 credits!");
+      Alert.alert("Card Added", "You received $50 credits!");
     } catch (e: any) {
-      Alert.alert("Error", e.message || "Failed");
+      Alert.alert("Error", e.message || "Failed to add card");
     }
   }
 
@@ -43,56 +51,103 @@ export default function WalletScreen() {
     loadWallet();
   }, []);
 
-  if (loading) return <Text>Loading...</Text>;
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+        }}
+      >
+        <ActivityIndicator size="large" />
+      </SafeAreaView>
+    );
+  }
 
   return (
-    <View style={{ padding: 20 }}>
-      <Text style={{ fontSize: 24, fontWeight: "700" }}>Wallet</Text>
-
-      <Text style={{ marginTop: 20, fontSize: 18 }}>
-        Account Total Amount: ${wallet.credits}
+    <SafeAreaView
+      style={{
+        flex: 1,
+        paddingHorizontal: 20,
+        paddingTop: 20,
+        backgroundColor: "#fff",
+      }}
+    >
+      <Text
+        style={{
+          fontSize: 32,
+          fontWeight: "700",
+          textAlign: "center",
+          marginBottom: 20,
+        }}
+      >
+        Wallet
       </Text>
 
-      {wallet.has_card ? (
-        <>
-          <Text style={{ marginTop: 20, fontSize: 18, fontWeight: "600" }}>
-            Payment Method
-          </Text>
-          <Text style={{ marginTop: 10 }}>
-            Card on file: **** **** **** {wallet.last4}
-          </Text>
-        </>
-      ) : (
-        <>
-          <Text style={{ marginTop: 20, fontSize: 18, fontWeight: "600" }}>
-            Add Payment Method
-          </Text>
+      <View style={{ marginTop: 20 }}>
+        <Text style={{ fontSize: 20, fontWeight: "600" }}>
+          Account Balance: ${wallet.credits}
+        </Text>
 
-          <TextInput
-            placeholder="Card Number"
-            value={card}
-            onChangeText={setCard}
-            style={{ borderWidth: 1, padding: 10, marginTop: 10 }}
-          />
+        {wallet.has_card ? (
+          <View style={{ marginTop: 30 }}>
+            <Text style={{ fontSize: 18, fontWeight: "600" }}>
+              Payment Method
+            </Text>
+            <Text style={{ marginTop: 10, fontSize: 16 }}>
+              Card on file: **** **** **** {wallet.last4}
+            </Text>
+          </View>
+        ) : (
+          <View style={{ marginTop: 30 }}>
+            <Text style={{ fontSize: 18, fontWeight: "600" }}>
+              Add Payment Method
+            </Text>
 
-          <TextInput
-            placeholder="MM/YY"
-            value={exp}
-            onChangeText={setExp}
-            style={{ borderWidth: 1, padding: 10, marginTop: 10 }}
-          />
+            <TextInput
+              placeholder="Card Number"
+              value={card}
+              onChangeText={setCard}
+              style={{
+                borderWidth: 1,
+                padding: 12,
+                borderRadius: 8,
+                marginTop: 12,
+              }}
+            />
 
-          <TextInput
-            placeholder="CVV"
-            secureTextEntry
-            value={cvv}
-            onChangeText={setCvv}
-            style={{ borderWidth: 1, padding: 10, marginTop: 10 }}
-          />
+            <TextInput
+              placeholder="MM/YY"
+              value={exp}
+              onChangeText={setExp}
+              style={{
+                borderWidth: 1,
+                padding: 12,
+                borderRadius: 8,
+                marginTop: 12,
+              }}
+            />
 
-          <Button title="Save Card & Get $50" onPress={addCard} />
-        </>
-      )}
-    </View>
+            <TextInput
+              placeholder="CVV"
+              secureTextEntry
+              value={cvv}
+              onChangeText={setCvv}
+              style={{
+                borderWidth: 1,
+                padding: 12,
+                borderRadius: 8,
+                marginTop: 12,
+              }}
+            />
+
+            <View style={{ marginTop: 18 }}>
+              <Button title="Save Card & Get $50" onPress={addCard} />
+            </View>
+          </View>
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
