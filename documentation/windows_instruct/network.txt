@@ -1,0 +1,2 @@
+cd phishguard
+npx expo install expo-network
