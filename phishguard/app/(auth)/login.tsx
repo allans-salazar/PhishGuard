@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, TextInput, Button, Alert } from "react-native";
+import { View, Text, TextInput, Button, Alert, TouchableOpacity } from "react-native";
 import { login, loadRole } from "../../src/api";
 import { router } from "expo-router";
 
@@ -39,6 +39,7 @@ export default function Login() {
         Login
       </Text>
 
+      {/* Email */}
       <TextInput
         placeholder="Email"
         value={email}
@@ -55,6 +56,7 @@ export default function Login() {
         }}
       />
 
+      {/* Password */}
       <TextInput
         placeholder="Password"
         secureTextEntry
@@ -70,7 +72,28 @@ export default function Login() {
         }}
       />
 
+      {/* LOGIN BUTTON */}
       <Button title="Login" onPress={doLogin} />
+
+      {/* CREATE ACCOUNT BUTTON */}
+      <TouchableOpacity
+        style={{
+          marginTop: 25,
+          paddingVertical: 12,
+        }}
+        onPress={() => router.push("/(auth)/register")}
+      >
+        <Text
+          style={{
+            textAlign: "center",
+            color: "#2e86de",
+            fontSize: 16,
+            fontWeight: "600",
+          }}
+        >
+          Create an Account
+        </Text>
+      </TouchableOpacity>
     </View>
   );
 }

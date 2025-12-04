@@ -2,7 +2,7 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-const BASE = "http://127.0.0.1:8000";
+const BASE = "http://132.238.110.162:8000";
 const TOKEN_KEY = "phishguard_token";
 const ROLE_KEY = "phishguard_role";
 
@@ -277,6 +277,8 @@ export async function attemptScenario(scenarioId: number, choiceId: number) {
    AI
 -------------------------------------------------------- */
 export async function askAI(question: string) {
+  console.log("AI CALLING:", api.defaults.baseURL);   // <--- ADD THIS
+
   await applyAuthHeader();
   const { data } = await api.post("/ai/ask", { question });
   return data;
