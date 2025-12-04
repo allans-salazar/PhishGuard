@@ -1,5 +1,4 @@
-// app/(tabs)/catalog.tsx
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -8,13 +7,10 @@ import {
   Alert,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import {
-  listCatalog,
-  listMyPurchases,
-  walletBalance,
-  loadToken,
-} from "../../src/api";
-import { router } from "expo-router";
+import { useFocusEffect } from "expo-router";
+import { useCallback } from "react";
+
+import { listCatalog, listMyPurchases, walletBalance } from "../../src/api";
 
 export default function Catalog() {
   const [modules, setModules] = useState<any[]>([]);
@@ -37,6 +33,13 @@ export default function Catalog() {
     setLoading(false);
   }
 
+  // Refresh when tab becomes active
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [])
+  );
+
   async function buyModule(id: number, price: number) {
     if (!wallet || wallet.credits < price) {
       Alert.alert("Insufficient Funds", "You do not have enough credits.");
@@ -45,36 +48,27 @@ export default function Catalog() {
 
     Alert.alert(
       "Confirm Purchase",
-      `Are you sure you want to buy this module for $${price}?`,
+      `Buy this module for $${price}?`,
       [
         { text: "Cancel", style: "cancel" },
         {
           text: "Buy",
           onPress: async () => {
             try {
-              const token = await loadToken();
+              const res = await fetch(`http://127.0.0.1:8000/purchase/${id}`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+              });
 
-              const res = await fetch(
-                `http://127.0.0.1:8000/purchase/${id}`,
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type": "application/json",
-                    Authorization: `Bearer ${token}`, // 🔥 REQUIRED
-                  },
-                }
-              );
-
-              if (!res.ok) {
-                const err = await res.json().catch(() => ({}));
-                Alert.alert("Purchase Failed", err.detail || "Unknown error");
+              if (res.status !== 200) {
+                Alert.alert("Error", "Purchase failed.");
                 return;
               }
 
-              Alert.alert("Success", "Module purchased successfully!");
-              load(); // refresh wallet + purchases
+              Alert.alert("Success", "Module purchased!");
+              load(); // refresh
             } catch (e) {
-              Alert.alert("Error", "Unable to complete purchase.");
+              Alert.alert("Error", "Could not complete purchase");
             }
           },
         },
@@ -82,18 +76,10 @@ export default function Catalog() {
     );
   }
 
-  useEffect(() => {
-    load();
-  }, []);
-
   if (loading) {
     return (
       <SafeAreaView
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-        }}
+        style={{ flex: 1, justifyContent: "center", alignItems: "center" }}
       >
         <ActivityIndicator size="large" />
       </SafeAreaView>
@@ -109,23 +95,11 @@ export default function Catalog() {
         backgroundColor: "#fff",
       }}
     >
-      <Text
-        style={{
-          fontSize: 22,
-          fontWeight: "700",
-          marginBottom: 10,
-        }}
-      >
+      <Text style={{ fontSize: 22, fontWeight: "700", marginBottom: 10 }}>
         Wallet Balance: ${wallet?.credits ?? 0}
       </Text>
 
-      <Text
-        style={{
-          fontSize: 28,
-          fontWeight: "700",
-          marginBottom: 15,
-        }}
-      >
+      <Text style={{ fontSize: 28, fontWeight: "700", marginBottom: 15 }}>
         Training Catalog
       </Text>
 
@@ -148,39 +122,15 @@ export default function Catalog() {
             <Text>{m.description}</Text>
 
             {owned ? (
-              <>
-                <Text
-                  style={{
-                    marginTop: 8,
-                    fontWeight: "bold",
-                    color: "green",
-                  }}
-                >
-                  ✔ Purchased
-                </Text>
-
-                <TouchableOpacity
-                  style={{
-                    marginTop: 10,
-                    padding: 12,
-                    backgroundColor: "#3498db",
-                    borderRadius: 6,
-                  }}
-                  onPress={() =>
-                    router.push(`/(tabs)/train?moduleId=${m.id}`)
-                  }
-                >
-                  <Text
-                    style={{
-                      color: "white",
-                      textAlign: "center",
-                      fontSize: 16,
-                    }}
-                  >
-                    Start Training
-                  </Text>
-                </TouchableOpacity>
-              </>
+              <Text
+                style={{
+                  marginTop: 8,
+                  fontWeight: "bold",
+                  color: "green",
+                }}
+              >
+                ✔ Purchased
+              </Text>
             ) : (
               <>
                 <Text style={{ marginTop: 8, fontSize: 16 }}>
@@ -197,11 +147,7 @@ export default function Catalog() {
                   onPress={() => buyModule(m.id, m.price)}
                 >
                   <Text
-                    style={{
-                      color: "white",
-                      textAlign: "center",
-                      fontSize: 16,
-                    }}
+                    style={{ color: "white", textAlign: "center", fontSize: 16 }}
                   >
                     Buy Module
                   </Text>
