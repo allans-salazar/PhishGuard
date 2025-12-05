@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   Alert,
+  ScrollView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
@@ -16,7 +17,6 @@ import {
   applyAuthHeader,
 } from "../../src/api";
 
-// FIX: import the API package correctly
 import apiPackage from "../../src/api";
 
 export default function Catalog() {
@@ -40,7 +40,6 @@ export default function Catalog() {
     setLoading(false);
   }
 
-  // Refresh when screen is focused
   useFocusEffect(
     useCallback(() => {
       load();
@@ -48,32 +47,30 @@ export default function Catalog() {
   );
 
   async function buyModule(id: number, price: number) {
-  if (!wallet || wallet.credits < price) {
-    Alert.alert("Insufficient Funds", "You do not have enough credits.");
-    return;
-  }
+    if (!wallet || wallet.credits < price) {
+      Alert.alert("Insufficient Funds", "You do not have enough credits.");
+      return;
+    }
 
-  Alert.alert("Confirm Purchase", `Buy this module for $${price}?`, [
-    { text: "Cancel", style: "cancel" },
-    {
-      text: "Buy",
-      onPress: async () => {
-        try {
-          await applyAuthHeader();
+    Alert.alert("Confirm Purchase", `Buy this module for $${price}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Buy",
+        onPress: async () => {
+          try {
+            await applyAuthHeader();
+            const res = await apiPackage.api.post(`/purchase/${id}`);
 
-          // FIX: use apiPackage.api.post
-          const res = await apiPackage.api.post(`/purchase/${id}`);
-
-          Alert.alert("Success", "Module purchased!");
-          load();
-        } catch (e) {
-          console.log("PURCHASE ERROR:", e);
-          Alert.alert("Error", "Purchase failed.");
-        }
+            Alert.alert("Success", "Module purchased!");
+            load();
+          } catch (e) {
+            console.log("PURCHASE ERROR:", e);
+            Alert.alert("Error", "Purchase failed.");
+          }
+        },
       },
-    },
-  ]);
-}
+    ]);
+  }
 
   if (loading) {
     return (
@@ -102,60 +99,71 @@ export default function Catalog() {
         Training Catalog
       </Text>
 
-      {modules.map((m) => {
-        const owned = purchased.includes(Number(m.id));
+      {/* SCROLLING ADDED HERE */}
+      <ScrollView
+        style={{ flex: 1 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        showsVerticalScrollIndicator={false}
+      >
+        {modules.map((m) => {
+          const owned = purchased.includes(Number(m.id));
 
-        return (
-          <View
-            key={m.id}
-            style={{
-              padding: 15,
-              marginVertical: 8,
-              borderWidth: 1,
-              borderRadius: 10,
-              backgroundColor: owned ? "#d4ffd4" : "#fff",
-              borderColor: owned ? "#2ecc71" : "#ccc",
-            }}
-          >
-            <Text style={{ fontSize: 20, fontWeight: "600" }}>{m.title}</Text>
-            <Text>{m.description}</Text>
+          return (
+            <View
+              key={m.id}
+              style={{
+                padding: 15,
+                marginVertical: 8,
+                borderWidth: 1,
+                borderRadius: 10,
+                backgroundColor: owned ? "#d4ffd4" : "#fff",
+                borderColor: owned ? "#2ecc71" : "#ccc",
+              }}
+            >
+              <Text style={{ fontSize: 20, fontWeight: "600" }}>{m.title}</Text>
+              <Text>{m.description}</Text>
 
-            {owned ? (
-              <Text
-                style={{
-                  marginTop: 8,
-                  fontWeight: "bold",
-                  color: "green",
-                }}
-              >
-                ✔ Purchased
-              </Text>
-            ) : (
-              <>
-                <Text style={{ marginTop: 8, fontSize: 16 }}>
-                  Price: ${m.price}
-                </Text>
-
-                <TouchableOpacity
+              {owned ? (
+                <Text
                   style={{
-                    marginTop: 10,
-                    padding: 12,
-                    backgroundColor: "#2ecc71",
-                    borderRadius: 6,
+                    marginTop: 8,
+                    fontWeight: "bold",
+                    color: "green",
                   }}
-                  onPress={() => buyModule(m.id, m.price)}
                 >
-                  <Text
-                    style={{ color: "white", textAlign: "center", fontSize: 16 }}
-                  >
-                    Buy Module
+                  ✔ Purchased
+                </Text>
+              ) : (
+                <>
+                  <Text style={{ marginTop: 8, fontSize: 16 }}>
+                    Price: ${m.price}
                   </Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        );
-      })}
+
+                  <TouchableOpacity
+                    style={{
+                      marginTop: 10,
+                      padding: 12,
+                      backgroundColor: "#2ecc71",
+                      borderRadius: 6,
+                    }}
+                    onPress={() => buyModule(m.id, m.price)}
+                  >
+                    <Text
+                      style={{
+                        color: "white",
+                        textAlign: "center",
+                        fontSize: 16,
+                      }}
+                    >
+                      Buy Module
+                    </Text>
+                  </TouchableOpacity>
+                </>
+              )}
+            </View>
+          );
+        })}
+      </ScrollView>
     </SafeAreaView>
   );
 }
