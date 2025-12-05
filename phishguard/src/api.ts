@@ -2,6 +2,8 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
+console.log("🚨 USING CORRECT phishguard/src/api.ts FILE");
+
 const LOCAL_IP = "172.20.10.9"; // <--- your current IP
 
 // FastAPI backend

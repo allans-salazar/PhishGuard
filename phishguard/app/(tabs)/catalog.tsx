@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,9 +8,16 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useFocusEffect } from "expo-router";
-import { useCallback } from "react";
 
-import { listCatalog, listMyPurchases, walletBalance } from "../../src/api";
+import {
+  listCatalog,
+  listMyPurchases,
+  walletBalance,
+  applyAuthHeader,
+} from "../../src/api";
+
+// FIX: import the API package correctly
+import apiPackage from "../../src/api";
 
 export default function Catalog() {
   const [modules, setModules] = useState<any[]>([]);
@@ -33,7 +40,7 @@ export default function Catalog() {
     setLoading(false);
   }
 
-  // Refresh when tab becomes active
+  // Refresh when screen is focused
   useFocusEffect(
     useCallback(() => {
       load();
@@ -41,40 +48,32 @@ export default function Catalog() {
   );
 
   async function buyModule(id: number, price: number) {
-    if (!wallet || wallet.credits < price) {
-      Alert.alert("Insufficient Funds", "You do not have enough credits.");
-      return;
-    }
-
-    Alert.alert(
-      "Confirm Purchase",
-      `Buy this module for $${price}?`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Buy",
-          onPress: async () => {
-            try {
-              const res = await fetch(`http://127.0.0.1:8000/purchase/${id}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-              });
-
-              if (res.status !== 200) {
-                Alert.alert("Error", "Purchase failed.");
-                return;
-              }
-
-              Alert.alert("Success", "Module purchased!");
-              load(); // refresh
-            } catch (e) {
-              Alert.alert("Error", "Could not complete purchase");
-            }
-          },
-        },
-      ]
-    );
+  if (!wallet || wallet.credits < price) {
+    Alert.alert("Insufficient Funds", "You do not have enough credits.");
+    return;
   }
+
+  Alert.alert("Confirm Purchase", `Buy this module for $${price}?`, [
+    { text: "Cancel", style: "cancel" },
+    {
+      text: "Buy",
+      onPress: async () => {
+        try {
+          await applyAuthHeader();
+
+          // FIX: use apiPackage.api.post
+          const res = await apiPackage.api.post(`/purchase/${id}`);
+
+          Alert.alert("Success", "Module purchased!");
+          load();
+        } catch (e) {
+          console.log("PURCHASE ERROR:", e);
+          Alert.alert("Error", "Purchase failed.");
+        }
+      },
+    },
+  ]);
+}
 
   if (loading) {
     return (
