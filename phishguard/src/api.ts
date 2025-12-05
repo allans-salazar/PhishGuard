@@ -2,19 +2,7 @@
 import axios from "axios";
 import * as SecureStore from "expo-secure-store";
 
-/*
-  ---------------------------------------------------
-  ✅ FIXED LAN IP (RECOMMENDED FOR CAMPUS NETWORK)
-  ---------------------------------------------------
-  Expo cannot reliably detect your IP on enterprise Wi-Fi.
-  You confirmed your real Wi-Fi IP from:
-
-      ipconfig getifaddr en0 → 132.238.110.180
-
-  So we hard-set it for stable AI + API access.
-*/
-
-const LOCAL_IP = "172.20.10.9"; // <--- your current real campus IP
+const LOCAL_IP = "172.20.10.9"; // <--- your current IP
 
 // FastAPI backend
 const API = `http://${LOCAL_IP}:8000`;
