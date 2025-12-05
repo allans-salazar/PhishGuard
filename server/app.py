@@ -1,10 +1,13 @@
-# server/app.py
+# ============================================================
+#                     FASTAPI SERVER (UPDATED AI SECTION)
+# ============================================================
+
 from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Dict, Any
-import os
 import httpx
+import socket
 
 from db import query
 from auth import (
@@ -15,12 +18,30 @@ from auth import (
     get_current_user,
     require_provider,
 )
+print("🔥 DEBUG — RUNNING app.py FROM:", __file__)
+# ---------------------------------------------
+# AI MODEL CONFIG — AUTO-DETECT IP
+# ---------------------------------------------
 
-# ---------------------------------------------
-# AI MODEL CONFIG
-# ---------------------------------------------
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://127.0.0.1:11434")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+def get_local_ip():
+    """Detect the Mac’s LAN IP address automatically."""
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # connect to Google DNS (no traffic actually sent)
+        ip = s.getsockname()[0]
+        s.close()
+        return ip
+    except:
+        return "127.0.0.1"
+
+LOCAL_IP = get_local_ip()
+OLLAMA_URL = f"http://{LOCAL_IP}:11434"
+OLLAMA_MODEL = "llama3.2:3b"
+
+print("🚀 OLLAMA CONFIG")
+print("   LOCAL IP:", LOCAL_IP)
+print("   URL:", OLLAMA_URL)
+print("   MODEL:", OLLAMA_MODEL)
 
 app = FastAPI(title="PhishGuard API")
 
@@ -213,7 +234,6 @@ def provider_list_scenarios(module_id: int, user=Depends(require_provider)):
 
 @app.put("/provider/scenarios/{scenario_id}")
 def update_scenario(scenario_id: int, body: NewScenario, user=Depends(require_provider)):
-
     owner = query("""
         SELECT m.created_by
         FROM scenarios s
@@ -237,7 +257,6 @@ def update_scenario(scenario_id: int, body: NewScenario, user=Depends(require_pr
 
 @app.delete("/provider/scenarios/{scenario_id}")
 def delete_scenario(scenario_id: int, user=Depends(require_provider)):
-
     owner = query("""
         SELECT m.created_by
         FROM scenarios s
@@ -269,8 +288,6 @@ class UpdateChoice(BaseModel):
 
 @app.post("/provider/scenarios/{scenario_id}/choices")
 def add_choice(scenario_id: int, body: NewChoice, user=Depends(require_provider)):
-
-    # Ensure ownership
     owner = query("""
         SELECT m.created_by
         FROM scenarios s
@@ -338,7 +355,6 @@ def get_choice(choice_id: int, user=Depends(require_provider)):
 
 @app.put("/provider/choices/{choice_id}")
 def update_choice(choice_id: int, body: UpdateChoice, user=Depends(require_provider)):
-
     owner = query("""
         SELECT m.created_by
         FROM choices c
@@ -363,7 +379,6 @@ def update_choice(choice_id: int, body: UpdateChoice, user=Depends(require_provi
 
 @app.delete("/provider/choices/{choice_id}")
 def delete_choice(choice_id: int, user=Depends(require_provider)):
-
     owner = query("""
         SELECT m.created_by
         FROM choices c
@@ -455,19 +470,16 @@ def purchases_mine(user=Depends(get_current_user)):
         WHERE user_id = :u
     """, {"u": user["id"]})
 
-    # return list like:  [41, 42, 55]
     return {"modules": [int(r[0]) for r in rows]}
 
 @app.post("/purchase/{module_id}")
 def purchase_module(module_id: int, user=Depends(get_current_user)):
-    # Check module exists
     price_row = query("SELECT price FROM modules WHERE id=:m", {"m": module_id})
     if not price_row:
         raise HTTPException(404, "Module not found")
 
     price = float(price_row[0][0])
 
-    # Already purchased?
     already = query("""
         SELECT 1 FROM purchases
         WHERE user_id = :u AND module_id = :m
@@ -476,7 +488,6 @@ def purchase_module(module_id: int, user=Depends(get_current_user)):
     if already:
         raise HTTPException(400, "Already purchased")
 
-    # Check wallet
     wallet = query("""
         SELECT credits FROM wallets WHERE user_id=:u
     """, {"u": user["id"]})
@@ -489,14 +500,12 @@ def purchase_module(module_id: int, user=Depends(get_current_user)):
     if credits < price:
         raise HTTPException(400, "Insufficient funds")
 
-    # Deduct credits
     query("""
         UPDATE wallets
         SET credits = credits - :p
         WHERE user_id=:u
     """, {"p": price, "u": user["id"]}, commit=True)
 
-    # Add purchase
     query("""
         INSERT INTO purchases(user_id, module_id)
         VALUES(:u, :m)
@@ -505,7 +514,7 @@ def purchase_module(module_id: int, user=Depends(get_current_user)):
     return {"ok": True, "message": "Module purchased successfully"}
 
 # ============================================================
-#                     WALLET (REALISTIC SYSTEM)
+#                     WALLET
 # ============================================================
 
 class AddCardBody(BaseModel):
@@ -547,20 +556,40 @@ def wallet_add_card(body: AddCardBody, user=Depends(get_current_user)):
 
     return {"ok": True, "credits": 50, "last4": last4}
 
-
 # ============================================================
-#                     AI
+#                     AI (UPDATED)
 # ============================================================
 
 def ask_ollama(question: str):
+    print("\n🤖 Calling Ollama:")
+    print("   → URL:", OLLAMA_URL)
+    print("   → MODEL:", OLLAMA_MODEL)
+    print("   → QUESTION:", question)
+
     try:
-        with httpx.Client(timeout=10) as c:
+        with httpx.Client(timeout=20) as c:
             r = c.post(
                 f"{OLLAMA_URL}/api/generate",
-                json={"model": OLLAMA_MODEL, "prompt": question, "stream": False},
+                json={
+                    "model": OLLAMA_MODEL,
+                    "prompt": question,
+                    "stream": False,
+                },
             )
-        return r.json().get("response", "").strip()
-    except:
+
+        print("   ← STATUS:", r.status_code)
+
+        if r.status_code != 200:
+            print("❌ OLLAMA ERROR:", r.text)
+            return None
+
+        res = r.json()
+        print("   ← RAW RESPONSE:", res)
+
+        return res.get("response", "").strip()
+
+    except Exception as e:
+        print("❌ OLLAMA CONNECTION FAILED:", e)
         return None
 
 class AskAI(BaseModel):
@@ -569,6 +598,10 @@ class AskAI(BaseModel):
 @app.post("/ai/ask")
 def ai_ask(body: AskAI, user=Depends(get_current_user)):
     ans = ask_ollama(body.question)
+
     if ans:
         return {"answer": ans}
-    return {"answer": "Hover links, verify sender domains, never share OTPs."}
+
+    return {
+        "answer": "AI unavailable. Verify sender domains, never click unknown links, avoid sharing OTP codes."
+    }
